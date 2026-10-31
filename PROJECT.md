@@ -46,7 +46,7 @@ Always run `npm test`, `npm run typecheck` before finishing work; run `npm run e
 ## GitHub Pages constraints
 - Static hosting only: no server, no SPA rewrites → **HashRouter**.
 - Vite `base: '/exerciseTracker/'` (change in `vite.config.ts` and `playwright.config.ts` if the repo name differs).
-- Service worker via vite-plugin-pwa (`generateSW`, navigateFallback); icons in `public/`.
+- Service worker via vite-plugin-pwa (`generateSW`, navigateFallback); icons in `public/` (iOS needs the PNG `apple-touch-icon.png` linked in index.html; SVG icons are ignored by iOS, so regenerate the PNGs if icon.svg changes).
 - Deployment: `.github/workflows/deploy.yml` (on push to `main`: `npm ci`, `npm test`, `npm run build`, deploy-pages). Enable Pages → Source: GitHub Actions.
 
 ## Testing
