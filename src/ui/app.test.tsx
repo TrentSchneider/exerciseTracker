@@ -252,9 +252,9 @@ describe('settings', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     const user = await renderApp('/settings');
     await user.click(await screen.findByRole('button', { name: 'Export data' }));
+    expect(await screen.findByText('Export downloaded.')).toBeInTheDocument();
     expect(createUrl).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
-    expect(await screen.findByText('Export downloaded.')).toBeInTheDocument();
   });
 
   async function importFile(user: Awaited<ReturnType<typeof renderApp>>, content: string) {
