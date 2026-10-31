@@ -151,3 +151,13 @@ test('HIIT auto-advance setting persists', async ({ page }) => {
   await page.reload();
   await expect(page.getByRole('checkbox', { name: /Auto-complete HIIT/ })).toBeChecked();
 });
+
+test('navigating between pages resets scroll to the top', async ({ page }) => {
+  await page.goto('./#/exercises');
+  await expect(page.getByRole('heading', { name: 'Exercises', exact: true })).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+});

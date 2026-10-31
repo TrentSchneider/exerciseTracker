@@ -1,4 +1,5 @@
-import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { HashRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { Icon, type IconName } from './ui/components/Icon';
 import { AppProvider, useApp } from './ui/AppContext';
 import { ActiveWorkoutPage } from './ui/pages/ActiveWorkoutPage';
@@ -25,6 +26,12 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
 function Shell() {
   const app = useApp();
   if (!app.ready) return <p className="loading">Loading…</p>;
@@ -42,6 +49,7 @@ function Shell() {
         ))}
       </nav>
       <main className="content">
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/recovery" element={<HomePage />} />
