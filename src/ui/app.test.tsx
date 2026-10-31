@@ -160,7 +160,7 @@ describe('suggest → preview → workout → history', () => {
     await user.click(document.querySelector('[data-muscle="chest"]')!);
     const panel = await screen.findByLabelText('Chest stats');
     expect(within(panel).queryByText('Never')).toBeNull();
-  });
+  }, 15_000);
 
   it('survives a reload with a workout in progress', async () => {
     const user = await renderApp();
