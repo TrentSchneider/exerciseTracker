@@ -5,29 +5,41 @@ import { useApp } from '../AppContext';
 
 const WEIGHT_EQUIPMENT_IDS = new Set(['dumbbell', 'barbell', 'cable', 'bands', 'kettlebell', 'leg_press']);
 
+const parseWeights = (text: string) => text.split(/[\s,;]+/).filter(Boolean).map(Number);
+const mergeWeights = (list: number[]) => [...new Set(list)].sort((x, y) => x - y);
+
 function WeightOptionsEditor({ equipment }: { equipment: Equipment }) {
   const app = useApp();
-  const [text, setText] = useState('');
+  const units = app.settings.units;
+  const [values, setValues] = useState<number[]>([]);
+  const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setText((equipment.weightOptionsKg ?? []).map((kg) => String(kgToDisplay(kg, app.settings.units))).join(', '));
-  }, [equipment.weightOptionsKg, app.settings.units]);
+    setValues(mergeWeights((equipment.weightOptionsKg ?? []).map((kg) => kgToDisplay(kg, units))));
+  }, [equipment.weightOptionsKg, units]);
+
+  // Adds whatever is typed (one weight, or a pasted list split by spaces/commas); returns the new list or null if invalid.
+  const commitDraft = (): number[] | null => {
+    const entered = parseWeights(draft);
+    if (entered.some((value) => !Number.isFinite(value) || value <= 0)) {
+      setError('Enter positive weights, one at a time or separated by spaces.');
+      setSaved(false);
+      return null;
+    }
+    const next = mergeWeights([...values, ...entered]);
+    setValues(next);
+    setDraft('');
+    setError('');
+    return next;
+  };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const values = text.trim() ? text.split(',').map((part) => Number(part.trim())) : [];
-    if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
-      setError('Enter positive weights separated by commas, or leave the field blank to clear them.');
-      setSaved(false);
-      return;
-    }
-    await app.setEquipmentWeightOptions(
-      equipment.id,
-      [...new Set(values.map((value) => displayToKg(value, app.settings.units)))].sort((a, b) => a - b),
-    );
-    setError('');
+    const next = commitDraft();
+    if (!next) return;
+    await app.setEquipmentWeightOptions(equipment.id, next.map((value) => displayToKg(value, units)));
     setSaved(true);
   };
 
@@ -36,18 +48,35 @@ function WeightOptionsEditor({ equipment }: { equipment: Equipment }) {
       <summary>Available weights (optional)</summary>
       <form className="stack" onSubmit={save}>
         <label className="field">
-          <span>Weights in {app.settings.units}, separated by commas</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            aria-label={`${equipment.name} available weights`}
-            placeholder={app.settings.units === 'lb' ? 'e.g. 5, 10, 15' : 'e.g. 2.5, 5, 7.5'}
-            value={text}
-            onChange={(event) => { setText(event.target.value); setError(''); setSaved(false); }}
-          />
+          <span>Add a weight in {units}</span>
+          <div className="row">
+            <input
+              type="text"
+              inputMode="decimal"
+              aria-label={`${equipment.name} available weights`}
+              placeholder={units === 'lb' ? 'e.g. 15' : 'e.g. 7.5'}
+              value={draft}
+              onChange={(event) => { setDraft(event.target.value); setError(''); setSaved(false); }}
+              onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); commitDraft(); setSaved(false); } }}
+            />
+            <button type="button" aria-label="Add weight" onClick={() => { commitDraft(); setSaved(false); }}>Add</button>
+          </div>
         </label>
+        {values.length > 0 && (
+          <ul className="weight-chips" aria-label={`${equipment.name} weights`}>
+            {values.map((value) => (
+              <li key={value} className="weight-chip">
+                {value} {units}
+                <button
+                  type="button" aria-label={`Remove ${value} ${units}`}
+                  onClick={() => { setValues(values.filter((v) => v !== value)); setSaved(false); }}
+                >×</button>
+              </li>
+            ))}
+          </ul>
+        )}
         <p className="hint">
-          Suggestions for exercises using this equipment will use only these weights.
+          Suggestions for exercises using this equipment will use only these weights. Leave the list empty to allow any weight.
           For dumbbells, enter the weight of one dumbbell; for barbells, enter the total loaded bar weight.
         </p>
         <div className="row">

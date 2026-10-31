@@ -73,12 +73,23 @@ describe('equipment', () => {
       expect(dumbbells?.weightOptionsKg).toEqual([5, 10, 15].map((value) => displayToKg(value, 'lb')));
     });
 
-    await user.clear(weights);
+    expect(within(dumbbellRow).getByRole('list', { name: 'Dumbbells weights' })).toHaveTextContent('5 lb×10 lb×15 lb×');
+    await user.type(weights, '20');
+    await user.click(within(dumbbellRow).getByRole('button', { name: 'Add weight' }));
+    await user.click(within(dumbbellRow).getByRole('button', { name: 'Remove 5 lb' }));
+    expect(within(dumbbellRow).getByRole('list', { name: 'Dumbbells weights' })).toHaveTextContent('10 lb×15 lb×20 lb×');
+    await user.type(weights, '25 30');
+    await user.click(within(dumbbellRow).getByRole('button', { name: 'Save weights' }));
+    await waitFor(async () => {
+      const dumbbells = (await getAll<Equipment>('equipment')).find((e) => e.id === 'dumbbell');
+      expect(dumbbells?.weightOptionsKg).toEqual([10, 15, 20, 25, 30].map((value) => displayToKg(value, 'lb')));
+    });
+
     await user.type(weights, 'not a weight');
     await user.click(within(dumbbellRow).getByRole('button', { name: 'Save weights' }));
     expect(await within(dumbbellRow).findByRole('alert')).toHaveTextContent(/positive weights/);
     expect((await getAll<Equipment>('equipment')).find((e) => e.id === 'dumbbell')?.weightOptionsKg)
-      .toEqual([5, 10, 15].map((value) => displayToKg(value, 'lb')));
+      .toEqual([10, 15, 20, 25, 30].map((value) => displayToKg(value, 'lb')));
   });
 });
 

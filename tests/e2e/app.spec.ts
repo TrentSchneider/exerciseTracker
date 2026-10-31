@@ -59,7 +59,7 @@ test('equipment weight options constrain workout suggestions', async ({ page }) 
   await page.getByRole('checkbox', { name: /Dumbbells/ }).click();
   const dumbbellRow = page.locator('li').filter({ has: page.getByRole('checkbox', { name: /Dumbbells/ }) });
   await dumbbellRow.getByText('Available weights (optional)').click();
-  await dumbbellRow.getByLabel('Dumbbells available weights').fill('5, 10, 15');
+  await dumbbellRow.getByLabel('Dumbbells available weights').fill('5 10 15');
   await dumbbellRow.getByRole('button', { name: 'Save weights' }).click();
   await expect(dumbbellRow.getByText('Weights saved.')).toBeVisible();
 
