@@ -5,7 +5,7 @@ Instruction base for any chat session working on this project. Read fully before
 ## Overview
 Offline-first workout tracker (React + TypeScript + Vite PWA). All data lives in IndexedDB; there is no backend. Deployed to GitHub Pages at `/exerciseTracker/`.
 
-Features: landing page at `/` with onboarding guidance and calls to action; recovery dashboard at `/recovery`; custom workout builder, equipment registry with optional available-weight lists, ~90 seeded exercises + custom ones, rep/weight/bodyweight/effort logging, muscle fatigue + 0–100% recovery on a front/back SVG body diagram (dark blue → red), suggested workouts (fatigue, target muscles, regular/superset/HIIT mix, time limit), planner (single workouts and routines), weight/rep/time recommendations per set type, rest and exercise timers, searchable history with summaries, per-exercise progress graphs, pre-workout overview with adjust/swap, skippable exercises, export/import with overwrite warnings.
+Features: Home dashboard at `/` (DashboardPage: today's planned workouts, quick start, recovery summary, activity; a closable welcome card with a "Getting Started" modal, state saved as `settings.welcomeDismissed` and restorable in Settings); recovery dashboard at `/recovery`; custom workout builder, equipment registry with optional available-weight lists, ~90 seeded exercises + custom ones, rep/weight/bodyweight/effort logging, muscle fatigue + 0–100% recovery on a front/back SVG body diagram (dark blue → red), suggested workouts (fatigue, target muscles, regular/superset/HIIT mix, time limit), planner (single workouts and routines), weight/rep/time recommendations per set type, rest and exercise timers, searchable history with summaries, per-exercise progress graphs, pre-workout overview with adjust/swap, skippable exercises, export/import with overwrite warnings.
 
 ## Commands
 | Command | Purpose |
@@ -27,7 +27,7 @@ Always run `npm test`, `npm run typecheck` before finishing work; run `npm run e
 - `src/db/exportImport.ts` — JSON backup `{app:'workout-tracker-pwa', schemaVersion:1, exportedAt, data}`; modes merge (imported wins on same id) or replace (wipe first); computes overwrite counts for warnings.
 - `src/ui/AppContext.tsx` — global state/mutators (`useApp()`).
 - `src/ui/components/` — BodyDiagram, Timer, LineChart, Modal, Fields, MuscleStatsPanel.
-- `src/ui/pages/` — Landing, Home (recovery), Workouts, Suggest, Build, Preview, ActiveWorkout, Plan, History (+SessionDetail), Exercises (+ExerciseDetail), Equipment, Settings.
+- `src/ui/pages/` — Dashboard (home), Home (recovery map, route `/recovery`), Workouts, Suggest, Build, Preview, ActiveWorkout, Plan, History (+SessionDetail), Exercises (+ExerciseDetail), Equipment, Settings.
 - `src/App.tsx` — HashRouter, nav (side nav ≥800px, bottom nav on mobile).
 
 ## Key rules / algorithms

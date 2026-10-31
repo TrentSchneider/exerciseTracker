@@ -58,6 +58,7 @@ export interface Settings {
   restScale: number; // multiplier on recommended rest
   plannerView?: 'list' | 'calendar'; // saved planner display mode
   theme?: 'auto' | 'light' | 'dark'; // appearance; absent = auto (follow the device)
+  welcomeDismissed?: boolean; // Home welcome card closed; reopened from Settings
   hiitAutoAdvance?: boolean; // HIIT work timer ending logs the exercise and moves on
 }
 

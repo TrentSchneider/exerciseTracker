@@ -2,10 +2,13 @@ import { expect, test } from '@playwright/test';
 
 test('loads, shows body diagram, and runs a suggested workout end to end', async ({ page }) => {
   await page.goto('./');
-  await expect(page.getByRole('heading', { name: 'Your training, your equipment, your progress.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "Today's workouts" })).toBeVisible();
+  await page.getByRole('button', { name: 'Getting Started' }).click();
   await expect(page.getByRole('heading', { name: 'How it works' })).toBeVisible();
   await expect(page.getByText(/Your workouts stay on this device/)).toBeVisible();
-  await page.getByRole('link', { name: 'Recovery' }).click();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('link', { name: 'Recovery', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'Muscle recovery' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Front muscle diagram' })).toBeVisible();
   await page.locator('[data-muscle="chest"]').first().click();
@@ -25,27 +28,29 @@ test('loads, shows body diagram, and runs a suggested workout end to end', async
   await expect(page.getByRole('link').filter({ hasText: /workout/i }).first()).toBeVisible();
 });
 
-test('landing page actions lead to the relevant app flows', async ({ page }) => {
+test('dashboard actions lead to the relevant app flows and the welcome card can be dismissed', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
-  await page.getByRole('link', { name: 'Start a workout' }).click();
+  await page.getByRole('link', { name: 'My saved workouts' }).click();
   await expect(page.getByRole('heading', { name: 'Workouts', exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'Home' }).click();
-  await expect(page.getByRole('heading', { name: 'Your training, your equipment, your progress.' })).toBeVisible();
   await page.goto('./');
   await page.getByRole('link', { name: 'Build a custom workout' }).click();
   await expect(page.getByRole('heading', { name: 'Build a workout' })).toBeVisible();
+
   await page.goto('./');
-  await page.getByRole('link', { name: 'Set up your equipment' }).click();
-  await expect(page.getByRole('heading', { name: 'My equipment' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close welcome card' }).click();
+  await expect(page.getByText('A workout tracker that adapts to you')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByText('A workout tracker that adapts to you')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await page.getByRole('checkbox', { name: /Show the welcome card/ }).click();
+  await page.getByRole('link', { name: 'Home' }).click();
+  await expect(page.getByText('A workout tracker that adapts to you')).toBeVisible();
 });
 
-test('landing content uses row cards without changing other card layouts', async ({ page }) => {
-  await page.goto('./');
-  await expect(page.locator('.landing-feature').first()).toHaveCSS('flex-direction', 'row');
-  await expect(page.locator('.landing-step').first()).toHaveCSS('flex-direction', 'row');
-
-  await page.getByRole('link', { name: 'Recovery' }).click();
+test('recovery page keeps its column card layout', async ({ page }) => {
+  await page.goto('./#/recovery');
   await expect(page.locator('.home-grid > .card').first()).toHaveCSS('flex-direction', 'column');
 });
 

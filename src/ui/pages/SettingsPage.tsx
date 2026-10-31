@@ -84,6 +84,16 @@ export function SettingsPage() {
         </label>
       </div>
       <div className="card stack">
+        <h2>Home</h2>
+        <label className="check">
+          <input
+            type="checkbox" checked={!app.settings.welcomeDismissed}
+            onChange={(e) => app.updateSettings({ welcomeDismissed: !e.target.checked })}
+          />
+          Show the welcome card on the Home dashboard
+        </label>
+      </div>
+      <div className="card stack">
         <h2>Backup</h2>
         <p className="muted">All data lives in this browser's IndexedDB. Export regularly — clearing site data deletes it.</p>
         <div className="row wrap">

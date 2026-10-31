@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useApp } from '../AppContext';
-import { Icon, type IconName } from '../components/Icon';
+import { Icon, type IconName } from './Icon';
 
 const FEATURES: { icon: IconName; title: string; text: string }[] = [
   {
@@ -26,27 +25,9 @@ const STEPS = [
   { title: 'Log and improve', text: 'Record each set, review your history, and use your progress to guide what comes next.' },
 ];
 
-export function LandingPage() {
-  const app = useApp();
-
+export function GettingStarted({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <section className="landing stack">
-      <header className="landing-hero">
-        <p className="landing-eyebrow">A workout tracker that adapts to you</p>
-        <h1>Your training, your equipment, your progress.</h1>
-        <p className="landing-lede">
-          Build workouts that fit your goals and gear. Track every set, see how your muscles recover,
-          and get recommendations that adapt as you train—all from one simple tracker.
-        </p>
-        <div className="row wrap landing-actions">
-          <Link className="button primary" to={app.active ? '/workout' : '/workouts'}>
-            {app.active ? 'Resume workout' : 'Start a workout'}
-          </Link>
-          <Link className="button" to="/build">Build a custom workout</Link>
-          <Link className="button landing-setup" to="/equipment">Set up your equipment</Link>
-        </div>
-      </header>
-
+    <div className="landing stack" onClick={(e) => { if ((e.target as HTMLElement).closest('a')) onNavigate?.(); }}>
       <section className="landing-section" aria-labelledby="landing-benefits">
         <div className="landing-section-heading">
           <p className="landing-eyebrow">Built around your training</p>
@@ -92,6 +73,6 @@ export function LandingPage() {
         </p>
         <Link to="/settings">Back up your data</Link>
       </aside>
-    </section>
+    </div>
   );
 }

@@ -7,7 +7,7 @@ import { EquipmentPage } from './ui/pages/EquipmentPage';
 import { ExerciseDetailPage, ExercisesPage } from './ui/pages/ExercisesPage';
 import { HistoryPage, SessionDetailPage } from './ui/pages/HistoryPage';
 import { HomePage } from './ui/pages/HomePage';
-import { LandingPage } from './ui/pages/LandingPage';
+import { DashboardPage } from './ui/pages/DashboardPage';
 import { PlanPage } from './ui/pages/PlanPage';
 import { PreviewPage } from './ui/pages/PreviewPage';
 import { SettingsPage } from './ui/pages/SettingsPage';
@@ -43,7 +43,7 @@ function Shell() {
       </nav>
       <main className="content">
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<DashboardPage />} />
           <Route path="/recovery" element={<HomePage />} />
           <Route path="/workouts" element={<WorkoutsPage />} />
           <Route path="/suggest" element={<SuggestPage />} />
@@ -57,7 +57,7 @@ function Shell() {
           <Route path="/exercises/:id" element={<ExerciseDetailPage />} />
           <Route path="/equipment" element={<EquipmentPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<LandingPage />} />
+          <Route path="*" element={<DashboardPage />} />
         </Routes>
       </main>
     </div>
