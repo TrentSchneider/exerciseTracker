@@ -1095,3 +1095,12 @@ progress { accent-color: var(--accent); }
 .weight-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .weight-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.3rem 0.2rem 0.7rem; border-radius: 999px; background: var(--panel-2); font-weight: 600; }
 .weight-chip button { border: 0; background: transparent; padding: 0 0.45rem; font-size: 1.1rem; line-height: 1; color: var(--muted); }
+
+/* Mobile zoom: iOS zooms into focused fields under 16px and on double-tap; pinch-zoom stays available. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+a, button, summary, label, [role="button"], input, select, textarea { touch-action: manipulation; }
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea { font-size: max(16px, 1rem); }
+}
