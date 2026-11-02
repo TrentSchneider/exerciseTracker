@@ -19,7 +19,7 @@ describe('home dashboard', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
 
     await user.click(screen.getByRole('button', { name: 'Close welcome card' }));
-    expect(screen.queryByText('A workout tracker that adapts to you')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('A workout tracker that adapts to you')).not.toBeInTheDocument());
     await waitFor(async () => expect((await getSetting<any>('settings', {})).welcomeDismissed).toBe(true));
 
     await user.click(screen.getByRole('link', { name: 'Settings' }));

@@ -7,18 +7,22 @@ import { primaryMuscles } from '../../domain/fatigue';
 import { MUSCLE_LABELS, type Exercise, type PlanItem, type SetLog } from '../../types';
 import { useApp } from '../AppContext';
 import { Timer } from '../components/Timer';
+import { useCountdown } from '../audio';
+import { formatSetValues } from '../components/SetsTable';
 import { ExerciseInfoModal } from '../components/ExerciseInfoModal';
 import { NumberField, SET_TYPE_LABELS, WeightField } from '../components/Fields';
 import { blockRest, blockTransition, buildBlocks } from '../../domain/workout';
 import { WorkoutOverview } from '../components/WorkoutOverview';
 
 // Not a native <button> so it stays usable inside the disabled (paused) fieldset: the guide is read-only.
-function InfoLink({ ex, onOpen }: { ex: Exercise; onOpen: (e: Exercise) => void }) {
+type InfoTarget = { ex: Exercise; itemId?: string };
+
+function InfoLink({ ex, itemId, onOpen }: { ex: Exercise; itemId?: string; onOpen: (t: InfoTarget) => void }) {
   return (
     <span
       role="button" tabIndex={0} className="link-btn" aria-label={`About ${ex.name}`}
-      onClick={() => onOpen(ex)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(ex); } }}
+      onClick={() => onOpen({ ex, itemId })}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen({ ex, itemId }); } }}
     >{ex.name}</span>
   );
 }
@@ -46,10 +50,12 @@ function SetForm({ item, lastLog, paused, onLog, onSkip }: {
   return (
     <div className="stack" data-testid="set-form">
       {timed && (
-        <Timer
-          label={item.setType === 'hiit' ? 'Work interval' : 'Exercise timer'} seconds={item.durationSec} paused={paused}
-          onDone={() => (autoAdvance ? submit(item.durationSec) : setDuration(item.durationSec))}
-        />
+        <fieldset className="plain" disabled={paused}>
+          <Timer
+            label={item.setType === 'hiit' ? 'Work interval' : 'Exercise timer'} seconds={item.durationSec} paused={paused} countdown
+            onDone={() => (autoAdvance ? submit(item.durationSec) : setDuration(item.durationSec))}
+          />
+        </fieldset>
       )}
       <div className="grid-2">
         {repBased && <NumberField label="Reps done" value={reps} min={0} onChange={setReps} />}
@@ -71,7 +77,7 @@ function SetForm({ item, lastLog, paused, onLog, onSkip }: {
         <span>Effort (RPE): {effort}/10</span>
         <input type="range" min={1} max={10} value={effort} onChange={(e) => setEffort(Number(e.target.value))} aria-label="Effort from 1 to 10" />
       </label>
-      <div className="row wrap">
+      <fieldset className="plain row wrap" disabled={paused}>
         <button
           type="button" className="primary"
           onClick={() => submit(duration)}
@@ -79,7 +85,7 @@ function SetForm({ item, lastLog, paused, onLog, onSkip }: {
           Complete set
         </button>
         <button type="button" onClick={onSkip}>Skip exercise</button>
-      </div>
+      </fieldset>
     </div>
   );
 }
@@ -90,8 +96,16 @@ export function ActiveWorkoutPage() {
   const a = app.active;
   const [rest, setRest] = useState<{ seconds: number; key: number; kind: 'set' | 'exercise' } | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [info, setInfo] = useState<Exercise | null>(null);
-  const paused = !!a?.pausedAt;
+  const [info, setInfo] = useState<InfoTarget | null>(null);
+  const [startCount, setStartCount] = useState(() => !!a && !a.pausedAt && a.cursor === 0 && Date.now() - a.startedAt < 5000);
+  const [resuming, setResuming] = useState(false);
+  const startN = useCountdown(startCount, () => setStartCount(false));
+  const resumeN = useCountdown(resuming, () => {
+    setResuming(false);
+    if (app.active) void app.setActive(resumeSession(app.active));
+  });
+  const countN = startN ?? resumeN;
+  const paused = !!a?.pausedAt || startCount;
 
   useEffect(() => {
     if (!a) return;
@@ -155,12 +169,17 @@ export function ActiveWorkoutPage() {
         <h1>{a.name}</h1>
         <div className="row">
           <span className="muted" aria-label="Elapsed time">{formatDuration(elapsed)}</span>
-          <button type="button" onClick={() => commit(paused ? resumeSession(a) : pauseSession(a))}>
-            {paused ? 'Resume workout' : 'Pause workout'}
+          <button type="button" onClick={() => (a.pausedAt ? setResuming(true) : commit(pauseSession(a)))} disabled={resuming || startCount}>
+            {a.pausedAt ? 'Resume workout' : 'Pause workout'}
           </button>
         </div>
       </div>
-      {paused && (
+      {countN !== null && (
+        <div className="countdown-overlay" role="alert" aria-label="Countdown">
+          <div className="countdown-number">{countN}</div>
+        </div>
+      )}
+      {a.pausedAt && (
         <div className="card paused-banner" role="status">
           <strong>Workout paused</strong>
           <p className="muted">The clock and any running timer are stopped. Resume when you're ready.</p>
@@ -169,17 +188,18 @@ export function ActiveWorkoutPage() {
       <progress value={done} max={Math.max(1, total)} aria-label="Workout progress" />
       <p className="muted">{done} of {total} sets complete</p>
 
-      <fieldset className="plain" disabled={paused}>
       {rest && step ? (
+        <fieldset className="plain" disabled={paused}>
         <div className="card">
           <Timer key={rest.key} label="Rest" seconds={rest.seconds} autoStart paused={paused} onDone={() => setRest(null)} onSkip={() => setRest(null)} skipLabel="Skip rest" />
           <p className="hint">{rest.kind === 'set' ? 'Rest between sets/rounds' : 'Rest before the next exercise'}</p>
           {nextItem() && <p>Up next: <strong>{app.exerciseById.get(nextItem()!.exerciseId)?.name}</strong></p>}
         </div>
+        </fieldset>
       ) : step && item && ex ? (
         <div className="card current" key={`${item.id}-${step.round}`}>
           <div className="row-between">
-            <h2><InfoLink ex={ex} onOpen={setInfo} /></h2>
+            <h2><InfoLink ex={ex} itemId={item.id} onOpen={setInfo} /></h2>
             <span className={`badge ${item.setType}`}>{SET_TYPE_LABELS[item.setType]}</span>
           </div>
           <p className="muted">{primaryMuscles(ex).map((m) => MUSCLE_LABELS[m]).join(', ')}</p>
@@ -200,6 +220,7 @@ export function ActiveWorkoutPage() {
         </div>
       )}
 
+      <fieldset className="plain" disabled={paused}>
       <div className="card">
         <h3>Exercises</h3>
         <WorkoutOverview
@@ -210,7 +231,12 @@ export function ActiveWorkoutPage() {
             return (
               <div className={`row-between active-item ${item?.id === it.id ? 'is-current' : ''}`}>
                 <span className={skipped ? 'struck' : ''}>
-                  {e ? <InfoLink ex={e} onOpen={setInfo} /> : it.exerciseId} <small>({n}/{it.sets})</small>
+                  {e ? <InfoLink ex={e} itemId={it.id} onOpen={setInfo} /> : it.exerciseId} <small>({n}/{it.sets})</small>
+                  {(a.logs[it.id] ?? []).map((l, i) => (
+                    <small key={i} className="set-line muted" style={{ display: 'block' }}>
+                      Set {i + 1}: {formatSetValues(l, e, app.settings.units)}
+                    </small>
+                  ))}
                 </span>
                 {skipped ? (
                   <button type="button" onClick={() => commit(undoSkip(a, it.id))}>Undo skip</button>
@@ -231,7 +257,13 @@ export function ActiveWorkoutPage() {
         <button type="button" className="primary" onClick={finish}>Finish workout</button>
         <button type="button" onClick={discard}>Discard</button>
       </div>
-      {info && <ExerciseInfoModal ex={info} onClose={() => setInfo(null)} />}
+      {info && (
+        <ExerciseInfoModal
+          ex={info.ex} onClose={() => setInfo(null)}
+          sets={info.itemId ? a.logs[info.itemId] ?? [] : undefined} units={app.settings.units}
+          onSaveSets={info.itemId ? (sets) => commit({ ...a, logs: { ...a.logs, [info.itemId!]: sets } }) : undefined}
+        />
+      )}
     </section>
   );
 }

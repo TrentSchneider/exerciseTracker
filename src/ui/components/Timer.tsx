@@ -1,30 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatClock } from '../../domain/units';
-
-function beep() {
-  try {
-    navigator.vibrate?.([200, 100, 200]);
-    const Ctx = window.AudioContext ?? (window as any).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const osc = ctx.createOscillator();
-    osc.connect(ctx.destination);
-    osc.frequency.value = 880;
-    osc.start();
-    osc.stop(ctx.currentTime + 0.25);
-  } catch {
-    /* audio is best-effort */
-  }
-}
+import { playTimerEnd, useCountdown } from '../audio';
 
 /**
  * Countdown timer with an editable duration. Used for rest between sets and for timed exercises.
  * Uses wall-clock end time so it stays accurate when the tab is throttled.
  */
-export function Timer({ label, seconds, autoStart = false, paused = false, onDone, onSkip, skipLabel = 'Skip' }: {
+export function Timer({ label, seconds, autoStart = false, countdown = false, paused = false, onDone, onSkip, skipLabel = 'Skip' }: {
   label: string;
   seconds: number;
   autoStart?: boolean;
+  countdown?: boolean; // run an audible 3-2-1 before each start/resume
   paused?: boolean; // freezes the countdown (workout paused); resumes where it left off
   onDone?: () => void;
   onSkip?: () => void;
@@ -33,6 +19,8 @@ export function Timer({ label, seconds, autoStart = false, paused = false, onDon
   const [duration, setDuration] = useState(seconds);
   const [remaining, setRemaining] = useState(seconds);
   const [running, setRunning] = useState(autoStart);
+  const [counting, setCounting] = useState(false);
+  const count = useCountdown(counting, () => { setCounting(false); setRunning(true); });
   const endRef = useRef(0);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
@@ -51,7 +39,7 @@ export function Timer({ label, seconds, autoStart = false, paused = false, onDon
       if (left <= 0) {
         clearInterval(t);
         setRunning(false);
-        beep();
+        playTimerEnd();
         doneRef.current?.();
       }
     }, 250);
@@ -67,6 +55,7 @@ export function Timer({ label, seconds, autoStart = false, paused = false, onDon
   };
 
   const reset = () => {
+    setCounting(false);
     setRunning(false);
     setRemaining(duration);
   };
@@ -74,7 +63,7 @@ export function Timer({ label, seconds, autoStart = false, paused = false, onDon
   return (
     <div className="timer" role="timer" aria-label={label}>
       <div className="timer-label">{label}</div>
-      <div className="timer-display" aria-live="off">{formatClock(remaining)}</div>
+      <div className="timer-display" aria-live="off">{count ?? formatClock(remaining)}</div>
       <div className="timer-row">
         <button type="button" onClick={() => adjust(-15)} aria-label="Subtract 15 seconds">−15s</button>
         <label className="timer-edit">
@@ -91,8 +80,13 @@ export function Timer({ label, seconds, autoStart = false, paused = false, onDon
         <button type="button" onClick={() => adjust(15)} aria-label="Add 15 seconds">+15s</button>
       </div>
       <div className="timer-row">
-        <button type="button" className="primary" onClick={() => setRunning((r) => !r)}>
-          {running ? 'Pause' : remaining < duration && remaining > 0 ? 'Resume' : 'Start'}
+        <button type="button" className="primary" onClick={() => {
+          if (counting) setCounting(false);
+          else if (running) setRunning(false);
+          else if (countdown) setCounting(true);
+          else setRunning(true);
+        }}>
+          {counting ? 'Cancel' : running ? 'Pause' : remaining < duration && remaining > 0 ? 'Resume' : 'Start'}
         </button>
         <button type="button" onClick={reset}>Reset</button>
         {onSkip && <button type="button" onClick={onSkip}>{skipLabel}</button>}

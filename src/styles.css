@@ -1104,3 +1104,19 @@ a, button, summary, label, [role="button"], input, select, textarea { touch-acti
   select,
   textarea { font-size: max(16px, 1rem); }
 }
+
+/* Start / resume countdown */
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+}
+.countdown-number {
+  font-size: 9rem;
+  font-weight: 800;
+  color: #fff;
+}

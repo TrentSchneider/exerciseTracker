@@ -32,6 +32,7 @@ export interface AppState {
   savePlan: (p: PlanEntry) => Promise<void>;
   deletePlan: (id: string) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
+  updateSession: (s: Session) => Promise<void>;
   setActive: (a: ActiveSession | null) => Promise<void>;
   finishActive: (a: ActiveSession) => Promise<Session>;
   setDraft: (w: Workout | null) => void;
@@ -153,6 +154,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deletePlan: async (id) => {
       await remove('plans', id);
       setPlans((l) => l.filter((p) => p.id !== id));
+    },
+    updateSession: async (s) => {
+      await put('sessions', s);
+      setSessions((l) => l.map((x) => (x.id === s.id ? s : x)));
     },
     deleteSession: async (id) => {
       await remove('sessions', id);

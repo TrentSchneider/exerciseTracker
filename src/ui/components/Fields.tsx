@@ -5,7 +5,7 @@ import { displayToKg, kgToDisplay, type Units } from '../../domain/units';
 
 export const SET_TYPE_LABELS: Record<SetType, string> = { regular: 'Regular sets', superset: 'Supersets', hiit: 'HIIT' };
 
-export function WeightField({ label, kg, units, onChange }: { label: string; kg: number; units: Units; onChange: (kg: number) => void }) {
+export function WeightField({ label, kg, units, onChange, hideLabel = false }: { hideLabel?: boolean; label: string; kg: number; units: Units; onChange: (kg: number) => void }) {
   const [text, setText] = useState(String(kgToDisplay(kg, units)));
   // Parent updates may arrive late (async persistence); ignore echoes of values this field emitted
   // so in-progress typing isn't overwritten. Unit changes always reformat.
@@ -20,7 +20,7 @@ export function WeightField({ label, kg, units, onChange }: { label: string; kg:
   }, [kg, units]);
   return (
     <label className="field">
-      <span>{label} ({units})</span>
+      <span className={hideLabel ? 'sr-only' : undefined}>{label} ({units})</span>
       <input
         type="number" inputMode="decimal" min={0} step="any" value={text}
         onChange={(e) => {
@@ -37,12 +37,12 @@ export function WeightField({ label, kg, units, onChange }: { label: string; kg:
   );
 }
 
-export function NumberField({ label, value, onChange, min = 0, max, step = 1 }: {
-  label: string; value: number; onChange: (n: number) => void; min?: number; max?: number; step?: number;
+export function NumberField({ label, value, onChange, min = 0, max, step = 1, hideLabel = false }: {
+  hideLabel?: boolean; label: string; value: number; onChange: (n: number) => void; min?: number; max?: number; step?: number;
 }) {
   return (
     <label className="field">
-      <span>{label}</span>
+      <span className={hideLabel ? 'sr-only' : undefined}>{label}</span>
       <input
         type="number" inputMode="numeric" min={min} max={max} step={step} value={value}
         onChange={(e) => {

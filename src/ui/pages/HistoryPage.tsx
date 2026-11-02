@@ -2,9 +2,10 @@ import { Icon } from '../components/Icon';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { formatDuration, formatWeight } from '../../domain/units';
-import type { Session, SessionExercise } from '../../types';
+import type { Session, SessionExercise, SetLog } from '../../types';
 import { useApp } from '../AppContext';
 import { SET_TYPE_LABELS } from '../components/Fields';
+import { SetsTable } from '../components/SetsTable';
 
 const dateStr = (t: number) => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -46,7 +47,7 @@ export function HistoryPage() {
   );
 }
 
-function ExerciseSummary({ se }: { se: SessionExercise }) {
+function ExerciseSummary({ se, onSave }: { se: SessionExercise; onSave: (sets: SetLog[]) => void }) {
   const app = useApp();
   const ex = app.exerciseById.get(se.exerciseId);
   const units = app.settings.units;
@@ -62,20 +63,7 @@ function ExerciseSummary({ se }: { se: SessionExercise }) {
         <Link to={`/exercises/${se.exerciseId}`}><strong>{ex?.name ?? se.exerciseId}</strong></Link>
         <span className={`badge ${se.setType}`}>{SET_TYPE_LABELS[se.setType]}</span>
       </div>
-      <table className="sets">
-        <thead><tr><th>Set</th><th>Reps</th><th>Weight</th><th>Time</th><th>Effort</th></tr></thead>
-        <tbody>
-          {se.sets.map((s, i) => (
-            <tr key={i}>
-              <td>{i + 1}</td>
-              <td>{ex?.kind === 'timed' || ex?.kind === 'cardio' ? '—' : s.reps}</td>
-              <td>{s.bodyweight ? (s.weightKg ? `BW + ${formatWeight(s.weightKg, units)}` : 'Bodyweight') : formatWeight(s.weightKg, units)}</td>
-              <td>{s.durationSec ? formatDuration(s.durationSec) : '—'}</td>
-              <td>{s.effort}/10</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <SetsTable ex={ex} sets={se.sets} units={units} onSave={onSave} />
       <small className="muted">
         {best > 0 ? `Top weight ${formatWeight(best, units)} · ` : ''}{volume > 0 ? `Volume ${formatWeight(volume, units)} · ` : ''}Avg effort {avgEffort.toFixed(1)}
       </small>
@@ -94,7 +82,10 @@ export function SessionDetailPage() {
       <Link to="/history"><Icon name="left" size={16} /> History</Link>
       <h1>{s.name}</h1>
       <p className="muted">{dateStr(s.completedAt)} · {formatDuration(s.durationSec)}</p>
-      <ul className="list">{s.exercises.map((se) => <ExerciseSummary key={se.itemId} se={se} />)}</ul>
+      <ul className="list">{s.exercises.map((se) => <ExerciseSummary
+        key={se.itemId} se={se}
+        onSave={(sets) => void app.updateSession({ ...s, exercises: s.exercises.map((x) => (x.itemId === se.itemId ? { ...x, sets } : x)) })}
+      />)}</ul>
       <button type="button" onClick={async () => { if (window.confirm('Delete this workout from history? Muscle recovery and exercise progress will be recalculated.')) { await app.deleteSession(s.id); nav('/history'); } }}>
         Delete workout
       </button>
