@@ -111,7 +111,8 @@ export function generateWorkout(input: GenerateInput): GenerateResult {
   const items: PlanItem[] = [];
 
   if (criteria.cardioWarmup) {
-    const cardio = available.filter(isMachineCardio);
+    const machines = available.filter(isMachineCardio);
+    const cardio = machines.length ? machines : available.filter(isFreeCardio);
     if (cardio.length) {
       const pick = cardio[Math.floor(rng() * cardio.length)];
       const it = makeItem(pick, 'regular', sessions, restScale, undefined, input.equipment);

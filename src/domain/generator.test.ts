@@ -138,9 +138,11 @@ describe('generateWorkout', () => {
     expect(workout.items[0].setType).toBe('regular');
   });
 
-  it('skips the warm-up when no cardio machine is owned', () => {
+  it('falls back to free cardio for the warm-up when no cardio machine is owned', () => {
     const { workout } = gen({ cardioWarmup: true }, FULL);
-    expect(byId.get(workout.items[0].exerciseId)!.kind).not.toBe('cardio');
+    const first = byId.get(workout.items[0].exerciseId)!;
+    expect(first.kind).toBe('cardio');
+    expect(isMachineCardio(first)).toBe(false);
   });
 
   it('fits the requested time frame', () => {
