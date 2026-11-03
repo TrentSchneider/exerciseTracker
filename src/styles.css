@@ -1127,3 +1127,7 @@ legend { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .check, .field, .hint, .warn, .muted, .stack > * { min-width: 0; overflow-wrap: anywhere; }
 .check { flex-wrap: nowrap; }
 .chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+
+/* Borderless fieldsets: keep the legend inside the panel instead of straddling its top edge */
+fieldset > legend { float: left; width: 100%; padding: 0; margin-bottom: 0.5rem; }
+fieldset > legend + * { clear: both; }
