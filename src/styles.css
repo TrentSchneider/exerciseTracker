@@ -1131,3 +1131,14 @@ legend { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 /* Borderless fieldsets: keep the legend inside the panel instead of straddling its top edge */
 fieldset > legend { float: left; width: 100%; padding: 0; margin-bottom: 0.5rem; }
 fieldset > legend + * { clear: both; }
+
+/* Completed-sets table: keep editable cells within narrow viewports */
+.sets { table-layout: fixed; }
+.sets th, .sets td { padding: 4px 3px; overflow-wrap: anywhere; }
+.sets th:first-child, .sets td:first-child { width: 2.2rem; }
+.sets td .field, .sets td input { min-width: 0; width: 100%; }
+.sets td input { padding-left: 6px; padding-right: 6px; box-sizing: border-box; }
+@media (max-width: 480px) {
+  .sets { font-size: 0.8rem; }
+  .sets th, .sets td { padding: 4px 2px; }
+}
