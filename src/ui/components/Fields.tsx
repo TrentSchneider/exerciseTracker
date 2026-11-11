@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { REGIONS, REGION_LABELS, REGION_MUSCLES, MUSCLE_LABELS, type Criteria, type SetType } from '../../types';
 import { exerciseCapacity, isFullBody, selectFullBody, selectionFits, toggleMuscle, toggleRegion, trimToCapacity } from '../../domain/targets';
 import { displayToKg, kgToDisplay, type Units } from '../../domain/units';
+import { NumericInput } from './NumericInput';
 
 export const SET_TYPE_LABELS: Record<SetType, string> = { regular: 'Regular sets', superset: 'Supersets', hiit: 'HIIT' };
 
@@ -32,6 +33,11 @@ export function WeightField({ label, kg, units, onChange, hideLabel = false }: {
             onChange(next);
           }
         }}
+        onBlur={(e) => {
+          if (!Number.isFinite(e.target.valueAsNumber) || e.target.valueAsNumber < 0) {
+            setText(String(kgToDisplay(kg, units)));
+          }
+        }}
       />
     </label>
   );
@@ -43,12 +49,9 @@ export function NumberField({ label, value, onChange, min = 0, max, step = 1, hi
   return (
     <label className="field">
       <span className={hideLabel ? 'sr-only' : undefined}>{label}</span>
-      <input
-        type="number" inputMode="numeric" min={min} max={max} step={step} value={value}
-        onChange={(e) => {
-          const v = parseFloat(e.target.value);
-          onChange(Number.isNaN(v) ? min : v);
-        }}
+      <NumericInput
+        inputMode="numeric" min={min} max={max} step={step} value={value}
+        onChange={onChange}
       />
     </label>
   );

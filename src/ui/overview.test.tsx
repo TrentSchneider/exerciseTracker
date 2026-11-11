@@ -90,6 +90,25 @@ describe('target tiers and ordering', () => {
 });
 
 describe('workout overview rests', () => {
+  it('allows clearing rest and entering HIIT work time below the minimum while typing', async () => {
+    const user = await renderApp();
+    await suggest(user, ['HIIT'], ['Regular sets']);
+    const rest = within(screen.getAllByTestId('set-rest')[0]).getByRole('spinbutton');
+    await user.clear(rest);
+    expect(rest).toHaveValue(null);
+    await user.type(rest, '25');
+    expect(rest).toHaveValue(25);
+
+    const work = within(screen.getAllByTestId('hiit-work')[0]).getByRole('spinbutton');
+    await user.clear(work);
+    await user.type(work, '1');
+    expect(work).toHaveValue(1);
+    await user.type(work, '5');
+    expect(work).toHaveValue(15);
+    await user.tab();
+    expect(work).toHaveValue(15);
+  });
+
   it('shows set rest to the right of each card and an editable rest between exercises', async () => {
     const user = await renderApp();
     await suggest(user, ['Supersets', 'HIIT']);

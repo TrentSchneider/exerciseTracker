@@ -21,4 +21,17 @@ describe('SetsTable', () => {
     expect(onSave).toHaveBeenCalledWith([{ ...sets[0], reps: 12 }]);
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
+
+  it('allows editing effort past the maximum temporarily and saves the bounded value', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<SetsTable ex={ex} sets={sets} units="kg" onSave={onSave} />);
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const effort = screen.getByLabelText('Set 1 effort');
+    await user.clear(effort);
+    await user.type(effort, '99');
+    expect(effort).toHaveValue(99);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenCalledWith([{ ...sets[0], effort: 10 }]);
+  });
 });

@@ -3,18 +3,16 @@ import type { ReactNode } from 'react';
 import { blockRest, blockTransition, blockWork, buildBlocks, setBlockRest, setBlockTransition, setBlockWork } from '../../domain/workout';
 import type { Exercise, PlanItem } from '../../types';
 import { SET_TYPE_LABELS } from './Fields';
+import { NumericInput } from './NumericInput';
 
 function RestInput({ label, value, onChange }: { label: string; value: number; onChange?: (n: number) => void }) {
   return (
     <label className="rest-field">
       <span>{label}</span>
-      <input
-        type="number" inputMode="numeric" min={0} step={5} value={value} aria-label={label}
+      <NumericInput
+        inputMode="numeric" min={0} step={5} value={value} aria-label={label}
         readOnly={!onChange}
-        onChange={(e) => {
-          const v = parseFloat(e.target.value);
-          onChange?.(Number.isNaN(v) ? 0 : Math.max(0, v));
-        }}
+        onChange={onChange}
       />
       <small>seconds</small>
     </label>
@@ -48,10 +46,10 @@ export function WorkoutOverview({ items, byId, renderItem, onChangeItems }: {
                 {block[0].setType === 'hiit' && (
                   <label className="work-field" data-testid="hiit-work">
                     <span>Work time for every exercise</span>
-                    <input
-                      type="number" inputMode="numeric" min={5} step={5} value={blockWork(block)}
+                    <NumericInput
+                      inputMode="numeric" min={5} step={5} value={blockWork(block)}
                       aria-label={`HIIT work time (seconds): ${names}`} readOnly={!onChangeItems}
-                      onChange={(e) => onChangeItems?.(setBlockWork(items, block, Math.max(5, parseFloat(e.target.value) || 5)))}
+                      onChange={onChangeItems && ((n) => onChangeItems(setBlockWork(items, block, n)))}
                     />
                     <span>seconds</span>
                   </label>

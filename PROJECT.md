@@ -52,7 +52,8 @@ Always run `npm test`, `npm run typecheck` before finishing work; run `npm run e
 ## Testing
 - Vitest + jsdom + Testing Library + `fake-indexeddb` (`src/test/setup.ts` gives each test a fresh IDBFactory). Helpers: `src/test/helpers.ts` (`session()`, `log()`, `seeded()`), `src/test/ui.tsx` (`renderApp`, `go`, `ownEquipment`).
 - Domain tests `src/domain/*.test.ts`, db tests `src/db/db.test.ts`, component tests `src/ui/components.test.tsx`, full-flow UI tests `src/ui/app.test.tsx`, overview/rest/guide tests `src/ui/overview.test.tsx`, e2e `tests/e2e/`.
-- Testing gotchas: number inputs need `tripleClick` + `keyboard` rather than `clear`; Playwright `check()` fails on controlled checkboxes that update after an async DB write — use `click()` then `toBeChecked()`.
+- Number inputs allow empty and out-of-range drafts while editing. On blur, bounded fields restore the last valid value if empty or clamp an out-of-range value; weight fields restore the saved weight if empty or negative.
+- Testing gotchas: Playwright `check()` fails on controlled checkboxes that update after an async DB write — use `click()` then `toBeChecked()`.
 - Add tests with every feature or fix.
 
 ## Conventions

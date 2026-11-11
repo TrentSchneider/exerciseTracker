@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatClock } from '../../domain/units';
 import { playTimerEnd, useCountdown } from '../audio';
+import { NumericInput } from './NumericInput';
 
 /**
  * Countdown timer with an editable duration. Used for rest between sets and for timed exercises.
@@ -68,10 +69,9 @@ export function Timer({ label, seconds, autoStart = false, countdown = false, pa
         <button type="button" onClick={() => adjust(-15)} aria-label="Subtract 15 seconds">−15s</button>
         <label className="timer-edit">
           <span className="sr-only">Duration in seconds</span>
-          <input
-            type="number" min={5} step={5} value={duration} aria-label="Duration in seconds"
-            onChange={(e) => {
-              const v = Math.max(5, Number(e.target.value) || 5);
+          <NumericInput
+            min={5} step={5} value={duration} aria-label="Duration in seconds"
+            onChange={(v) => {
               setDuration(v);
               if (!running) setRemaining(v);
             }}
