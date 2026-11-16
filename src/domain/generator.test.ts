@@ -83,7 +83,21 @@ describe('generateWorkout', () => {
     });
     expect(result.workout.items).toHaveLength(1);
     expect(result.workout.items[0].weightKg).toBe(weights[4]);
-    expect(result.workout.items[0].reps).toBe(14);
+    expect(result.workout.items[0].reps).toBe(13);
+  });
+
+  it('uses the selected progression goal when generating a workout', () => {
+    const history = [session('db_curl', [{ reps: 8, weightKg: 10, effort: 7 }], { at: NOW - HOUR })];
+    const input = {
+      exercises: [byId.get('db_curl')!], ownedEquipment: ['dumbbell'],
+      criteria: base({ targetMuscles: ['biceps'] }), sessions: history, rng: seeded(7),
+    };
+    const strength = generateWorkout({ ...input, progression: { progressionGoal: 'strength' } }).workout.items[0];
+    const muscle = generateWorkout({ ...input, progression: { progressionGoal: 'muscle' } }).workout.items[0];
+    expect(strength.reps).toBe(4);
+    expect(strength.weightKg).toBeGreaterThan(10);
+    expect(muscle.reps).toBe(9);
+    expect(muscle.weightKg).toBe(10);
   });
 
   it('with no equipment falls back to bodyweight exercises', () => {
@@ -138,6 +152,16 @@ describe('generateWorkout', () => {
       expect(it.durationSec).toBeGreaterThan(0);
       expect(it.restSec).toBeLessThanOrEqual(30);
     }
+  });
+
+  it('generates one progressed shared interval from actual same-type history for every member', () => {
+    const sessions = exercises.filter((e) => e.hiitOk).map((e) =>
+      session(e.id, [{ reps: 0, weightKg: 20, bodyweight: e.kind === 'bodyweight', durationSec: 40, effort: 7 }], { setType: 'hiit', at: NOW - HOUR }),
+    );
+    const { workout } = gen({ setTypes: ['hiit'], maxMinutes: 20 }, FULL, sessions);
+    const hiit = workout.items.filter((i) => i.setType === 'hiit');
+    expect(hiit.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(hiit.map((i) => i.durationSec))).toEqual(new Set([45]));
   });
 
   it('mixes set types, ordering regular → superset → hiit', () => {

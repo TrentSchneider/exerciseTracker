@@ -1,5 +1,6 @@
 export type SetType = 'regular' | 'superset' | 'hiit';
 export type ExerciseKind = 'weighted' | 'bodyweight' | 'timed' | 'cardio';
+export type ProgressionGoal = 'balanced' | 'strength' | 'muscle';
 
 export const MUSCLES = [
   'chest', 'shoulders_front', 'shoulders_side', 'shoulders_rear', 'biceps', 'triceps', 'forearms',
@@ -60,6 +61,8 @@ export interface Settings {
   theme?: 'auto' | 'light' | 'dark'; // appearance; absent = auto (follow the device)
   welcomeDismissed?: boolean; // Home welcome card closed; reopened from Settings
   hiitAutoAdvance?: boolean; // HIIT work timer ending logs the exercise and moves on
+  progressionGoal?: ProgressionGoal;
+  largeJumpPercent?: number;
 }
 
 export interface PlanItem {
@@ -73,6 +76,7 @@ export interface PlanItem {
   durationSec: number; // timed exercises, or hiit work interval
   restSec: number; // rest between sets (regular) or between rounds (superset / hiit block, shared by the block)
   restEdited?: boolean; // user set restSec; recommendations won't overwrite
+  workEdited?: boolean; // user set the shared HIIT work interval
   transitionSec?: number; // rest after this exercise/block before the next one (set on a block's last item)
   group?: string; // shared by items of the same superset / hiit block
   manual?: boolean; // user adjusted; recommendations won't overwrite

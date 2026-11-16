@@ -158,7 +158,7 @@ export function ExerciseDetailPage() {
       <h2>Next-session suggestions</h2>
       <div className="grid-3">
         {(Object.keys(SET_TYPE_LABELS) as SetType[]).filter((t) => (t === 'superset' ? ex.supersetOk : t === 'hiit' ? ex.hiitOk : true)).map((t) => {
-          const r = recommend(ex, t, app.sessions, app.settings.restScale, Date.now(), app.equipment);
+          const r = recommend(ex, t, app.sessions, app.settings.restScale, Date.now(), app.equipment, app.settings);
           return (
             <div className="card" key={t} data-testid={`rec-${t}`}>
               <strong>{SET_TYPE_LABELS[t]}</strong>

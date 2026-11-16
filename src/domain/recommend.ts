@@ -1,9 +1,15 @@
-import type { Equipment, Exercise, PlanItem, Session, SessionExercise, SetType } from '../types';
+import type { Equipment, Exercise, PlanItem, ProgressionGoal, Session, SessionExercise, SetLog, SetType } from '../types';
 
 export const TYPE_LOAD_FACTOR: Record<SetType, number> = { regular: 1, superset: 0.9, hiit: 0.8 };
 export const HIIT_WORK_SEC = 40;
 export const HIIT_REST_SEC = 20;
 const DAY_MS = 86_400_000;
+const WEIGHT_TOLERANCE = 0.001;
+
+export interface ProgressionSettings {
+  progressionGoal?: ProgressionGoal;
+  largeJumpPercent?: number;
+}
 
 export interface Recommendation {
   sets: number;
@@ -41,6 +47,7 @@ export function recommendedRest(ex: Exercise, setType: SetType, restScale = 1): 
 
 const roundHalf = (n: number) => Math.round(n * 2) / 2;
 const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+const sameWeight = (a: number, b: number) => Math.abs(a - b) <= WEIGHT_TOLERANCE;
 
 function exerciseWeightOptions(ex: Exercise, equipment: Equipment[]): number[] {
   for (const id of ex.equipment) {
@@ -54,165 +61,236 @@ function exerciseWeightOptions(ex: Exercise, equipment: Equipment[]): number[] {
 
 function closestWeight(options: number[], weight: number): number {
   return options.reduce((best, option) =>
-    Math.abs(option - weight) < Math.abs(best - weight) ? option : best,
-  options[0]);
+    Math.abs(option - weight) < Math.abs(best - weight) ? option : best, options[0]);
 }
 
-function constrainWeight(
-  options: number[], target: number, current: number, increasing: boolean,
-  reps: number, avgReps: number, reason: string, matchLoadWithReps = false,
-): { weight: number; reps: number; reason: string } {
-  if (!options.length) return { weight: target, reps, reason };
-  if (increasing) {
-    const next = options.find((option) => option > current + 0.001);
-    if (next !== undefined) return { weight: next, reps, reason };
-    const maxWeight = options[options.length - 1];
-    return {
-      weight: maxWeight,
-      reps: Math.max(reps, Math.round(avgReps) + 1, matchLoadWithReps ? Math.ceil(avgReps * target / maxWeight - 1e-10) : 0),
-      reason: 'Equipment limit reached — increasing reps instead.',
-    };
+function atOrBelow(options: number[], target: number): number {
+  return [...options].reverse().find((weight) => weight <= target + WEIGHT_TOLERANCE) ?? options[0];
+}
+
+interface WorkHistory {
+  at: number;
+  weight: number;
+  bodyweight: boolean;
+  sets: SetLog[];
+  effort: number;
+  reps: number;
+  duration: number;
+}
+
+function workHistory(entry: HistoryEntry, timed: boolean): WorkHistory | undefined {
+  const valid = entry.exercise.sets.filter((s) =>
+    Number.isFinite(s.weightKg) && s.weightKg >= 0 && Number.isFinite(s.effort) && s.effort >= 1 && s.effort <= 10 &&
+    (timed ? Number.isFinite(s.durationSec) && s.durationSec > 0 : Number.isFinite(s.reps) && s.reps > 0));
+  const last = valid[valid.length - 1];
+  if (!last) return undefined;
+  const sets = valid.filter((s) => s.bodyweight === last.bodyweight && sameWeight(s.weightKg, last.weightKg));
+  return {
+    at: entry.at, weight: last.weightKg, bodyweight: last.bodyweight, sets,
+    effort: mean(sets.map((s) => s.effort)),
+    reps: mean(sets.map((s) => s.reps)),
+    duration: mean(sets.map((s) => s.durationSec)),
+  };
+}
+
+function goalRange(ex: Exercise, goal: ProgressionGoal): [number, number] {
+  if (ex.kind !== 'weighted' || ex.custom || goal === 'balanced') return [ex.repMin, ex.repMax];
+  return goal === 'strength' ? [4, 8] : [8, 15];
+}
+
+function qualifiesForTrial(
+  history: WorkHistory[], current: number, next: number, bodyweight: boolean, repMin: number, repMax: number, timed: boolean,
+): boolean {
+  const relevant: WorkHistory[] = [];
+  for (const h of history) {
+    if (sameWeight(h.weight, next) && (h.sets.some((s) => s.effort >= 10) ||
+      (!timed && h.sets.some((s) => s.reps < repMin)))) break;
+    if (h.bodyweight === bodyweight && sameWeight(h.weight, current)) {
+      relevant.push(h);
+      if (relevant.length === 2) break;
+    }
   }
-  return { weight: closestWeight(options, target), reps, reason };
+  return relevant.length === 2 && relevant.every((h) =>
+    h.effort <= 7 && h.sets.every((s) => s.effort < 10 && (timed ? s.durationSec >= 40 : s.reps >= repMax + 2)));
+}
+
+function nextLoad(
+  options: number[], current: number, history: WorkHistory[], bodyweight: boolean,
+  repMin: number, repMax: number, timed: boolean, threshold: number,
+): { weight?: number; reason: string } {
+  const next = options.find((option) => option > current + WEIGHT_TOLERANCE);
+  if (next === undefined) return { reason: 'Equipment limit reached' };
+  const jump = current > WEIGHT_TOLERANCE ? (next - current) / current * 100 : Infinity;
+  const ready = qualifiesForTrial(history, current, next, bodyweight, repMin, repMax, timed);
+  if (current <= WEIGHT_TOLERANCE) {
+    return ready ? { weight: next, reason: 'Trying added weight; stop or adjust if it feels too hard.' }
+      : { reason: 'Build more consistent reps before trying added weight' };
+  }
+  if (jump > 30 + 1e-8) return { reason: 'The next weight jumps more than 30%; consider a smaller increment or harder variation' };
+  if (jump > threshold + 1e-8) {
+    return ready ? { weight: next, reason: `Trying the next weight (${Math.round(jump)}% increase); stop or adjust if it feels too hard.` }
+      : { reason: `The next weight is a large jump (${Math.round(jump)}%); build more consistent reps first` };
+  }
+  return { weight: next, reason: 'Ready to increase weight.' };
 }
 
 export function recommend(
   ex: Exercise, setType: SetType, sessions: Session[], restScale = 1, now = Date.now(), equipment: Equipment[] = [],
+  settings: ProgressionSettings = {},
 ): Recommendation {
   const weights = exerciseWeightOptions(ex, equipment);
-  const restSec = recommendedRest(ex, setType, restScale);
-  const mid = Math.round(ex.repMin + (ex.repMax - ex.repMin) / 3);
+  const goal = settings.progressionGoal ?? 'balanced';
+  const [repMin, repMax] = goalRange(ex, goal);
+  const goalNote = ex.kind === 'weighted' && !ex.custom && setType !== 'hiit' && goal !== 'balanced'
+    ? ` (${goal === 'muscle' ? 'muscle growth' : 'strength'} goal)` : '';
+  const threshold = settings.largeJumpPercent ?? 10;
+  const timed = ex.kind === 'timed' || ex.kind === 'cardio' || setType === 'hiit';
   const defaultDuration = setType === 'hiit' ? HIIT_WORK_SEC : ex.defaultSeconds ?? 30;
   const base: Recommendation = {
-    sets: 3, reps: mid, weightKg: 0, bodyweight: ex.kind !== 'weighted', durationSec: defaultDuration, restSec,
-    reason: 'No history yet — starting suggestion.',
+    sets: 3, reps: Math.round(repMin + (repMax - repMin) / 3), weightKg: 0,
+    bodyweight: ex.kind !== 'weighted', durationSec: defaultDuration, restSec: recommendedRest(ex, setType, restScale),
+    reason: `No history yet — starting suggestion.${goalNote}`,
   };
-  if (ex.kind === 'weighted') base.weightKg = ex.startKg ?? 10;
+  if (ex.kind === 'weighted') base.weightKg = weights.length ? closestWeight(weights, ex.startKg ?? 10) : ex.startKg ?? 10;
 
-  let hist = exerciseHistory(ex.id, sessions, setType);
+  let entries = exerciseHistory(ex.id, sessions, setType);
   let scale = 1;
   let borrowed = false;
-  if (hist.length === 0) {
-    const other = exerciseHistory(ex.id, sessions);
-    if (other.length === 0) {
-      if (ex.kind === 'weighted' && weights.length) base.weightKg = closestWeight(weights, base.weightKg);
-      return base;
-    }
-    hist = other;
-    scale = TYPE_LOAD_FACTOR[setType] / TYPE_LOAD_FACTOR[other[0].setType];
+  if (!entries.length) {
+    entries = exerciseHistory(ex.id, sessions);
+    if (!entries.length) return base;
+    scale = TYPE_LOAD_FACTOR[setType] / TYPE_LOAD_FACTOR[entries[0].setType];
     borrowed = true;
+    entries = entries.filter((entry) => entry.setType === entries[0].setType);
   }
-  const last = hist[0];
-  const logs = last.exercise.sets;
-  const avgEffort = mean(logs.map((l) => l.effort));
-  const avgReps = mean(logs.map((l) => l.reps));
-  const avgDur = mean(logs.map((l) => l.durationSec));
-  const topWeight = Math.max(...logs.map((l) => l.weightKg));
-  const daysAgo = (now - last.at) / DAY_MS;
-  const layoff = daysAgo > 42 ? 0.8 : daysAgo > 21 ? 0.9 : 1;
-  const src = borrowed ? ` (adjusted from ${last.setType} sets)` : '';
-  const sets = Math.min(5, Math.max(2, logs.length >= 2 ? logs.length : 3));
-  const rec: Recommendation = { ...base, sets };
-
-  if (ex.kind === 'timed' || ex.kind === 'cardio') {
-    let d = avgDur || defaultDuration;
-    if (avgEffort <= 7) { d *= 1.1; rec.reason = 'Felt easy — adding time.'; }
-    else if (avgEffort >= 9.5) { d *= 0.9; rec.reason = 'Felt maximal — easing time back.'; }
-    else rec.reason = 'Holding at last duration.';
-    if (layoff < 1) { d *= layoff; rec.reason = 'Time away — reduced duration.'; }
-    rec.durationSec = Math.max(10, Math.round(d / 5) * 5);
-    if (ex.kind === 'timed') rec.durationSec = Math.min(600, rec.durationSec);
-    if (weights.length && topWeight > 0) {
-      const currentWeight = topWeight * scale;
-      const nextWeight = weights.find((weight) => weight > currentWeight + 0.001);
-      if (avgEffort <= 7 && layoff === 1 && nextWeight !== undefined) {
-        rec.weightKg = nextWeight;
-        rec.durationSec = Math.max(10, Math.round((avgDur * 0.9 * layoff) / 5) * 5);
-        rec.reason = 'Easy at this load — increasing weight and reducing time.';
-      } else {
-        rec.weightKg = closestWeight(weights, currentWeight);
-        if (avgEffort <= 7 && layoff === 1 && nextWeight === undefined) rec.reason = 'Equipment limit reached — increasing time instead.';
+  const latestWork = workHistory(entries[0], timed);
+  const history = entries.map((entry) => workHistory(entry, timed)).filter((h): h is WorkHistory => h !== undefined);
+  if (!latestWork) {
+    if (borrowed && timed) {
+      const previous = workHistory(entries[0], false);
+      if (previous) {
+        const weight = previous.weight * scale;
+        return {
+          ...base, weightKg: weights.length && weight > 0 ? atOrBelow(weights, weight) : weight,
+          bodyweight: previous.bodyweight,
+          reason: `Not enough recorded time to progress — starting interval (adjusted from ${entries[0].setType} sets).`,
+        };
       }
-      rec.bodyweight = false;
     }
-    rec.reason += src;
-    return rec;
+    return { ...base, reason: `Not enough recorded work to progress — starting suggestion.${goalNote}` };
   }
+  const last = latestWork;
+  const src = (borrowed ? ` (adjusted from ${entries[0].setType} sets)` : '') + goalNote;
+  const layoff = (now - last.at) / DAY_MS > 42 ? 0.8 : (now - last.at) / DAY_MS > 21 ? 0.9 : 1;
+  const bodyweight = ex.kind === 'bodyweight' || last.bodyweight;
+  const rec: Recommendation = {
+    ...base, sets: Math.min(5, Math.max(2, last.sets.length >= 2 ? last.sets.length : 3)),
+    bodyweight, reps: timed ? base.reps : Math.max(1, Math.round(last.reps)),
+  };
+  let weight = last.weight * scale;
+  const tooHard = last.sets.some((s) => s.effort >= 10 || (!timed && s.reps < repMin));
 
-  if (ex.kind === 'bodyweight') {
-    let reps = Math.round(avgReps);
-    let added = topWeight * scale;
-    let increasing = false;
-    if (avgEffort >= 9.5 || avgReps < ex.repMin) {
-      reps = Math.max(ex.repMin - 2 > 1 ? ex.repMin - 2 : 1, reps - 2);
-      if (added > 0) added = roundHalf(added * 0.9);
-      rec.reason = 'Last time was very hard — reducing reps.';
-    } else if (avgReps >= ex.repMax && avgEffort <= 8.5) {
-      added = roundHalf(added + 2.5);
-      reps = ex.repMin;
-      increasing = true;
-      rec.reason = 'Hit the top of the rep range — adding weight.';
-    } else if (avgEffort <= 8.5) {
-      reps = Math.min(ex.repMax, reps + (avgEffort <= 7 ? 2 : 1));
-      rec.reason = 'Room to spare — adding reps.';
-    } else rec.reason = 'Holding at last performance.';
-    if (layoff < 1) {
-      if (increasing) added = topWeight * scale;
-      reps = Math.max(1, Math.round(reps * layoff));
-      increasing = false;
-      rec.reason = 'Time away — reduced reps.';
+  if (weights.length && weight > 0) {
+    if (!weights.some((option) => sameWeight(option, weight))) {
+      const available = atOrBelow(weights, weight);
+      rec.weightKg = layoff < 1 && !bodyweight ? atOrBelow(weights, available * layoff) : available;
+      if (!timed) rec.reps = Math.max(1, Math.round(Math.min(repMax, last.reps) * (layoff < 1 && bodyweight ? layoff : 1)));
+      rec.durationSec = Math.max(10, Math.round(last.duration * layoff / 5) * 5);
+      rec.reason = 'Previous weight is unavailable; using an available weight with a conservative target.' +
+        (layoff < 1 ? ' Time away — reduced target.' : '') + src;
+      return rec;
     }
-    if (weights.length && (added > 0 || topWeight > 0)) {
-      const constrained = constrainWeight(weights, added, topWeight * scale, increasing, reps, avgReps, rec.reason);
-      added = constrained.weight;
-      reps = constrained.reps;
-      rec.reason = constrained.reason;
-    }
-    rec.reps = reps;
-    rec.weightKg = Math.max(0, added);
-    rec.bodyweight = true;
-    rec.reason += src;
-    return rec;
+    weight = atOrBelow(weights, weight);
   }
-
-  // weighted: double progression driven by reps hit and effort
-  let weight = topWeight * scale;
-  let reps = Math.round(avgReps);
-  let increasing = false;
-  const step = Math.max(1, roundHalf(weight * 0.05));
-  if (avgEffort >= 9.5 || avgReps < ex.repMin) {
-    weight = roundHalf(weight - step);
-    reps = Math.max(ex.repMin, Math.round(avgReps));
-    rec.reason = 'Last time was very hard — reducing weight.';
-  } else if (avgReps >= ex.repMax && avgEffort < 9) {
-    weight = roundHalf(weight + step);
-    reps = ex.repMin;
-    increasing = true;
-    rec.reason = 'Hit the top of the rep range — increasing weight.';
-  } else if (avgEffort <= 8.5) {
-    reps = Math.min(ex.repMax, reps + 1);
-    rec.reason = 'Room to spare — adding a rep.';
-  } else rec.reason = 'Holding at last performance.';
   if (layoff < 1) {
-    weight = roundHalf((increasing ? topWeight * scale : weight) * layoff);
-    increasing = false;
-    rec.reason = 'Time away — reduced weight.';
+    if (bodyweight) rec.reps = Math.max(1, Math.round(rec.reps * layoff));
+    else weight = weights.length ? atOrBelow(weights, weight * layoff) : Math.max(0, roundHalf(weight * layoff));
+    if (timed) rec.durationSec = Math.max(10, Math.round(last.duration * layoff / 5) * 5);
+    rec.weightKg = weight;
+    rec.reason = 'Time away — reduced target.' + src;
+    return rec;
   }
-  const constrained = constrainWeight(weights, Math.max(0, roundHalf(weight)), topWeight * scale, increasing, reps, avgReps, rec.reason, true);
-  rec.weightKg = Math.max(0, constrained.weight);
-  reps = constrained.reps;
-  rec.reps = Math.max(1, reps);
-  rec.bodyweight = false;
-  rec.reason = constrained.reason + src;
+
+  if (timed) {
+    rec.durationSec = Math.max(10, Math.round(last.duration / 5) * 5);
+    if (ex.kind === 'timed') rec.durationSec = Math.min(600, rec.durationSec);
+    rec.weightKg = weight;
+    if (tooHard) {
+      const lower = weights.filter((option) => option < weight - WEIGHT_TOLERANCE).pop();
+      if (lower !== undefined && weight > 0) {
+        rec.weightKg = lower;
+        rec.reason = 'Last time felt maximal — reducing weight.';
+      } else {
+        if (setType !== 'hiit') rec.durationSec = Math.max(10, rec.durationSec - 5);
+        rec.reason = setType === 'hiit' ? 'Last time felt maximal — the HIIT block determines work time.' : 'Last time felt maximal — reducing time.';
+      }
+    } else if (last.effort <= 8.5) {
+      const choice = weights.length && ex.kind !== 'cardio' && last.duration >= 40
+        ? nextLoad(weights, weight, history, last.bodyweight, repMin, repMax, true, threshold) : undefined;
+      if (choice?.weight !== undefined) {
+        rec.weightKg = choice.weight;
+        rec.reason = choice.reason;
+      } else {
+        const previousDuration = rec.durationSec;
+        if (setType !== 'hiit') rec.durationSec = Math.min(ex.kind === 'timed' ? 600 : Infinity, rec.durationSec + 5);
+        rec.reason = setType === 'hiit' ? 'The HIIT block determines work time.'
+          : rec.durationSec === previousDuration ? 'Time limit reached — consider a harder variation or additional equipment.'
+          : choice ? `${choice.reason} — increasing time instead.` : 'Room to spare — adding time.';
+      }
+    } else rec.reason = setType === 'hiit' ? 'The HIIT block determines work time.' : 'Holding at last duration.';
+    rec.reason += src;
+    return rec;
+  }
+
+  if (tooHard) {
+    const lower = weights.filter((option) => option < weight - WEIGHT_TOLERANCE).pop();
+    if (weight > 0 && (lower !== undefined || !weights.length && !bodyweight)) {
+      weight = lower ?? Math.max(0, roundHalf(weight - Math.max(1, roundHalf(weight * 0.05))));
+      rec.reps = Math.max(1, Math.min(repMax, Math.round(last.reps)));
+      rec.reason = 'Last time was very hard — reducing weight.';
+    } else {
+      rec.reps = Math.max(1, Math.round(last.reps) - 1);
+      rec.reason = 'Last time was very hard — reducing reps.';
+    }
+  } else if (last.effort > 8.5) {
+    rec.reason = 'Holding at last performance.';
+  } else if (last.reps < repMax) {
+    rec.reps = Math.round(last.reps) + 1;
+    rec.reason = 'Room to spare — adding a rep.';
+  } else {
+    const choice = weights.length ? nextLoad(weights, weight, history, last.bodyweight, repMin, repMax, false, threshold) : undefined;
+    if (choice?.weight !== undefined) {
+      weight = choice.weight;
+      rec.reps = repMin;
+      rec.reason = choice.reason;
+    } else if (!weights.length && !bodyweight && weight > 0) {
+      const next = Math.round(weight * (1 + Math.min(5, threshold) / 100) * 100) / 100;
+      if (next > weight && (next - weight) / weight <= 0.3) {
+        weight = next;
+        rec.reps = repMin;
+        rec.reason = 'Hit the top of the rep range — increasing weight.';
+      } else {
+        rec.reps = Math.round(last.reps) + 1;
+        rec.reason = 'Weight increment is too large — adding a rep instead.';
+      }
+    } else {
+      rec.reps = Math.round(last.reps) + 1;
+      rec.reason = choice ? `${choice.reason} — adding a rep instead.` : 'No added weight configured — adding a rep instead.';
+      if (rec.reps >= 30) rec.reason += ' Consider a harder variation or additional equipment.';
+    }
+  }
+  rec.weightKg = weight;
+  rec.reason += src;
   return rec;
 }
 
 /** Fill a plan item from recommendations unless the user adjusted it manually. */
 export function applyRecommendation(
   item: PlanItem, ex: Exercise, sessions: Session[], restScale = 1, now = Date.now(), equipment: Equipment[] = [],
+  settings: ProgressionSettings = {},
 ): PlanItem {
   if (item.manual) return item;
-  const r = recommend(ex, item.setType, sessions, restScale, now, equipment);
+  const r = recommend(ex, item.setType, sessions, restScale, now, equipment, settings);
   return {
     ...item, sets: item.sets || r.sets, reps: r.reps, weightKg: r.weightKg, bodyweight: r.bodyweight,
     durationSec: item.setType === 'hiit' ? item.durationSec || HIIT_WORK_SEC : r.durationSec, restSec: item.restEdited ? item.restSec : r.restSec,

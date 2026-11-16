@@ -26,12 +26,12 @@ export function DashboardPage() {
   const todayCount = todayAgenda.entries.length + todayAgenda.routineDays.length;
 
   const genInput = () => ({
-    exercises: app.exercises, equipment: app.equipment, ownedEquipment: app.owned, sessions: app.sessions, status: app.status, restScale: app.settings.restScale,
+    exercises: app.exercises, equipment: app.equipment, ownedEquipment: app.owned, sessions: app.sessions, status: app.status, restScale: app.settings.restScale, progression: app.settings,
   });
   const openEntry = (e: PlanEntry) => {
     const w = app.workouts.find((x) => x.id === e.workoutId);
     if (!w) return;
-    app.setDraft(refreshRecommendations(w, app.exerciseById, app.sessions, app.settings.restScale, app.equipment));
+    app.setDraft(refreshRecommendations(w, app.exerciseById, app.sessions, app.settings.restScale, app.equipment, app.settings));
     nav('/preview');
   };
   const openRoutineDay = (routine: Routine, day: RoutineDay) => {

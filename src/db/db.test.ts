@@ -69,6 +69,19 @@ describe('export / import', () => {
     expect(() => parseImport('{"app":"workout-tracker-pwa","schemaVersion":99,"data":{}}')).toThrow(/newer version/);
     expect(() => parseImport('{"app":"workout-tracker-pwa","schemaVersion":1,"data":{"sessions":[{"x":1}]}}')).toThrow(/malformed/);
     expect(() => parseImport('{"app":"workout-tracker-pwa","schemaVersion":1}')).toThrow(/no data/);
+    expect(() => parseImport('{"app":"workout-tracker-pwa","schemaVersion":1,"data":{"settings":{"progressionGoal":"invalid"}}}')).toThrow(/progression goal/);
+    expect(() => parseImport('{"app":"workout-tracker-pwa","schemaVersion":1,"data":{"settings":{"largeJumpPercent":31}}}')).toThrow(/between 1% and 30%/);
+  });
+
+  it('round-trips progression settings and accepts legacy settings', async () => {
+    await initDb();
+    await setSetting('settings', { ...DEFAULT_SETTINGS, progressionGoal: 'strength', largeJumpPercent: 12.5 });
+    const file = parseImport(JSON.stringify(await exportData()));
+    await setSetting('settings', DEFAULT_SETTINGS);
+    await applyImport(file, 'replace');
+    expect(await getSetting('settings', DEFAULT_SETTINGS)).toMatchObject({ progressionGoal: 'strength', largeJumpPercent: 12.5 });
+    file.data.settings = { units: 'lb', bodyweightKg: 75, restScale: 1 };
+    expect(parseImport(JSON.stringify(file)).data.settings).toEqual(file.data.settings);
   });
 
   it('warns about overwritten and deleted records', async () => {

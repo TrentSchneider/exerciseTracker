@@ -1,9 +1,9 @@
 import type { Criteria, Equipment, Exercise, MuscleId, PlanItem, Session, SetType, Workout } from '../types';
 import { primaryMuscles, type MuscleStatus } from './fatigue';
-import { HIIT_REST_SEC, HIIT_WORK_SEC } from './recommend';
+import { HIIT_REST_SEC, HIIT_WORK_SEC, type ProgressionSettings } from './recommend';
 import { uid } from './units';
 import { allocate, exerciseCapacity, targetMuscleSet, DEFAULT_MINUTES, isFullBody } from './targets';
-import { buildBlocks, estimateBlockSeconds, estimateWorkoutSeconds, makeItem, newWorkout } from './workout';
+import { buildBlocks, estimateBlockSeconds, estimateWorkoutSeconds, makeItem, newWorkout, progressHiitBlock } from './workout';
 
 const MIN_RECOVERY = 40;
 
@@ -26,6 +26,7 @@ export interface GenerateInput {
   sessions: Session[];
   status?: Record<MuscleId, MuscleStatus>;
   restScale?: number;
+  progression?: ProgressionSettings;
   rng?: () => number;
   name?: string;
 }
@@ -115,7 +116,7 @@ export function generateWorkout(input: GenerateInput): GenerateResult {
     const cardio = machines.length ? machines : available.filter(isFreeCardio);
     if (cardio.length) {
       const pick = cardio[Math.floor(rng() * cardio.length)];
-      const it = makeItem(pick, 'regular', sessions, restScale, undefined, input.equipment);
+      const it = makeItem(pick, 'regular', sessions, restScale, undefined, input.equipment, input.progression);
       it.sets = 1;
       it.durationSec = pick.equipment.length ? 300 : 180;
       it.restSec = 0;
@@ -161,7 +162,7 @@ export function generateWorkout(input: GenerateInput): GenerateResult {
     if (t === 'regular') {
       const e = pickFor('regular');
       if (!e) return null;
-      return [makeItem(e, 'regular', sessions, restScale, undefined, input.equipment)];
+      return [makeItem(e, 'regular', sessions, restScale, undefined, input.equipment, input.progression)];
     }
     if (t === 'superset') {
       const first = pickFor('superset');
@@ -169,8 +170,8 @@ export function generateWorkout(input: GenerateInput): GenerateResult {
       const partner = pickFor('superset', first) ?? fillFrom('superset', first, (e) => e.id !== first.id);
       if (!partner) { release([first.id]); return null; }
       const g = uid('ss');
-      const a = makeItem(first, 'superset', sessions, restScale, g, input.equipment);
-      const b = makeItem(partner, 'superset', sessions, restScale, g, input.equipment);
+      const a = makeItem(first, 'superset', sessions, restScale, g, input.equipment, input.progression);
+      const b = makeItem(partner, 'superset', sessions, restScale, g, input.equipment, input.progression);
       const rounds = Math.min(a.sets, b.sets);
       a.sets = b.sets = rounds;
       a.restSec = b.restSec = Math.max(a.restSec, b.restSec);
@@ -190,13 +191,15 @@ export function generateWorkout(input: GenerateInput): GenerateResult {
     }
     if (picks.length < 2) { release(picks.map((p) => p.id)); return null; }
     const g = uid('hi');
-    return picks.map((p) => {
-      const it = makeItem(p, 'hiit', sessions, restScale, g, input.equipment);
+    const block = picks.map((p) => {
+      const it = makeItem(p, 'hiit', sessions, restScale, g, input.equipment, input.progression);
       it.sets = 3;
       it.durationSec = HIIT_WORK_SEC;
       it.restSec = HIIT_REST_SEC;
       return it;
     });
+    const workSec = progressHiitBlock(block, sessions);
+    return block.map((item) => ({ ...item, durationSec: workSec }));
   };
 
   const exhausted = new Set<SetType>();

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ImportError, analyzeImport, applyImport, exportData, parseImport, type ExportFile, type ImportImpact } from '../../db/exportImport';
 import { useApp } from '../AppContext';
-import { WeightField } from '../components/Fields';
+import { NumberField, WeightField } from '../components/Fields';
+import type { ProgressionGoal } from '../../types';
 import { Modal } from '../components/Modal';
 
 export function SettingsPage() {
@@ -11,6 +12,9 @@ export function SettingsPage() {
   const [confirmed, setConfirmed] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const [customJump, setCustomJump] = useState(false);
+  const jumpPercent = app.settings.largeJumpPercent ?? 10;
+  const isCustomJump = customJump || ![5, 10, 15, 20].includes(jumpPercent);
 
   const doExport = async () => {
     const data = await exportData();
@@ -82,6 +86,28 @@ export function SettingsPage() {
           />
           Auto-complete HIIT exercises when the work timer ends and move to the next
         </label>
+      </div>
+      <div className="card stack">
+        <h2>Progression</h2>
+        <label className="field"><span>Training goal</span>
+          <select value={app.settings.progressionGoal ?? 'balanced'} onChange={(e) => app.updateSettings({ progressionGoal: e.target.value as ProgressionGoal })}>
+            <option value="balanced">Balanced strength and muscle</option>
+            <option value="strength">Strength</option>
+            <option value="muscle">Muscle growth</option>
+          </select>
+        </label>
+        <p className="hint">The goal changes rep targets for built-in weighted exercises. Custom and bodyweight exercises keep their own ranges. Maximal strength may eventually require heavier loads.</p>
+        <label className="field"><span>Large weight jump threshold</span>
+          <select value={isCustomJump ? 'custom' : String(jumpPercent)} onChange={(e) => {
+            if (e.target.value === 'custom') setCustomJump(true);
+            else { setCustomJump(false); void app.updateSettings({ largeJumpPercent: Number(e.target.value) }); }
+          }}>
+            {[5, 10, 15, 20].map((n) => <option key={n} value={n}>{n}%</option>)}
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        {isCustomJump && <NumberField label="Custom large jump threshold (%)" value={jumpPercent} min={1} max={30} step={0.1} onChange={(largeJumpPercent) => { void app.updateSettings({ largeJumpPercent }); }} />}
+        <p className="hint">Larger jumps require extra practice. Jumps above 30% are not suggested automatically.</p>
       </div>
       <div className="card stack">
         <h2>Home</h2>

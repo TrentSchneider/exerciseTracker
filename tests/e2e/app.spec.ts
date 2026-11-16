@@ -152,6 +152,19 @@ test('HIIT auto-advance setting persists', async ({ page }) => {
   await expect(page.getByRole('checkbox', { name: /Auto-complete HIIT/ })).toBeChecked();
 });
 
+test('progression settings persist and affect exercise suggestions', async ({ page }) => {
+  await page.goto('./#/settings');
+  await page.getByLabel('Training goal').selectOption('strength');
+  await page.getByLabel('Large weight jump threshold').selectOption('custom');
+  await page.getByLabel('Custom large jump threshold (%)').fill('12.5');
+  await page.getByLabel('Custom large jump threshold (%)').blur();
+  await page.reload();
+  await expect(page.getByLabel('Training goal')).toHaveValue('strength');
+  await expect(page.getByLabel('Custom large jump threshold (%)')).toHaveValue('12.5');
+  await page.goto('./#/exercises/db_curl');
+  await expect(page.getByTestId('rec-regular')).toContainText('5 reps');
+});
+
 test('navigating between pages resets scroll to the top', async ({ page }) => {
   await page.goto('./#/exercises');
   await expect(page.getByRole('heading', { name: 'Exercises', exact: true })).toBeVisible();

@@ -31,6 +31,18 @@ export function parseImport(text: string): ExportFile {
     throw new ImportError('This export was made by a newer version of the app. Update the app and try again.');
   }
   if (!json.data || typeof json.data !== 'object') throw new ImportError('Export contains no data.');
+  const settings = json.data.settings;
+  if (settings != null) {
+    if (typeof settings !== 'object' || Array.isArray(settings)) throw new ImportError('The settings section is malformed.');
+    if (settings.progressionGoal !== undefined && !['balanced', 'strength', 'muscle'].includes(settings.progressionGoal)) {
+      throw new ImportError('The progression goal in settings is invalid.');
+    }
+    if (settings.largeJumpPercent !== undefined &&
+      (typeof settings.largeJumpPercent !== 'number' || !Number.isFinite(settings.largeJumpPercent) ||
+        settings.largeJumpPercent < 1 || settings.largeJumpPercent > 30)) {
+      throw new ImportError('The large weight jump threshold must be between 1% and 30%.');
+    }
+  }
   for (const s of DATA_STORES) {
     const rows = json.data[s] ?? [];
     if (!Array.isArray(rows) || rows.some((r) => !r || typeof r.id !== 'string')) {

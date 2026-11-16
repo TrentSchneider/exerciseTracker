@@ -56,7 +56,7 @@ export function BuildPage() {
     return LETTERS.find((l) => !groupsOf(t).includes(l)) ?? 'A';
   };
   const candidate = (ex: Exercise, t: SetType, choice: string): PlanItem =>
-    makeItem(ex, t, app.sessions, app.settings.restScale, targetGroup(t, choice), app.equipment);
+    makeItem(ex, t, app.sessions, app.settings.restScale, targetGroup(t, choice), app.equipment, app.settings);
   const groupFull = (t: SetType, choice: string) =>
     choice !== 'new' && items.filter((i) => i.setType === t && letterOf(i) === choice).length >= MAX_GROUP[t];
 
@@ -90,19 +90,19 @@ export function BuildPage() {
 
   const changeType = (it: PlanItem, setType: SetType) => {
     const ex = app.exerciseById.get(it.exerciseId)!;
-    const fresh = makeItem(ex, setType, app.sessions, app.settings.restScale, setType === 'regular' ? undefined : it.group ?? 'A', app.equipment);
+    const fresh = makeItem(ex, setType, app.sessions, app.settings.restScale, setType === 'regular' ? undefined : it.group ?? 'A', app.equipment, app.settings);
     patch(it.id, { ...fresh, id: it.id, sets: it.sets, manual: false });
   };
   const typeChangeFits = (it: PlanItem, t: SetType) => {
     const ex = app.exerciseById.get(it.exerciseId)!;
-    const fresh = makeItem(ex, t, app.sessions, app.settings.restScale, t === 'regular' ? undefined : it.group ?? 'A', app.equipment);
+    const fresh = makeItem(ex, t, app.sessions, app.settings.restScale, t === 'regular' ? undefined : it.group ?? 'A', app.equipment, app.settings);
     return fits(items.map((i) => (i.id === it.id ? { ...fresh, id: it.id, sets: it.sets } : i)));
   };
 
   const review = () => {
     const criteria = { targetMuscles: [], useFatigue: false, setTypes: [], cardioWarmup: false, ...app.draft?.criteria, maxMinutes };
     const w = { ...newWorkout(name, normalizeGroups(items), criteria), ...(app.draft ? { id: app.draft.id } : {}) };
-    app.setDraft(refreshRecommendations(w, app.exerciseById, app.sessions, app.settings.restScale, app.equipment));
+    app.setDraft(refreshRecommendations(w, app.exerciseById, app.sessions, app.settings.restScale, app.equipment, app.settings));
     nav('/preview');
   };
 

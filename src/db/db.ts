@@ -10,7 +10,10 @@ export const DATA_STORES = ['equipment', 'exercises', 'workouts', 'routines', 'p
 export type DataStore = (typeof DATA_STORES)[number];
 export const ALL_STORES = ['settings', ...DATA_STORES] as const;
 
-export const DEFAULT_SETTINGS: Settings = { units: 'lb', bodyweightKg: 75, restScale: 1, hiitAutoAdvance: false };
+export const DEFAULT_SETTINGS: Settings = {
+  units: 'lb', bodyweightKg: 75, restScale: 1, hiitAutoAdvance: false,
+  progressionGoal: 'balanced', largeJumpPercent: 10,
+};
 export const ACTIVE_SESSION_KEY = 'activeSession';
 
 let dbPromise: Promise<IDBPDatabase> | null = null;

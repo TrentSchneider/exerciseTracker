@@ -1,5 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react';
-import { getAll, initDb, put, getSetting } from '../db/db';
+import { DEFAULT_SETTINGS, getAll, initDb, put, getSetting } from '../db/db';
 import { exportData } from '../db/exportImport';
 import { DAY, session } from '../test/helpers';
 import { go, ownEquipment, renderApp } from '../test/ui';
@@ -90,6 +90,26 @@ describe('equipment', () => {
     expect(await within(dumbbellRow).findByRole('alert')).toHaveTextContent(/positive weights/);
     expect((await getAll<Equipment>('equipment')).find((e) => e.id === 'dumbbell')?.weightOptionsKg)
       .toEqual([10, 15, 20, 25, 30].map((value) => displayToKg(value, 'lb')));
+  });
+});
+
+describe('progression settings', () => {
+  it('persists the selected goal and a custom jump threshold', async () => {
+    await initDb();
+    await put('sessions', session('db_curl', [{ reps: 8, weightKg: 10, effort: 7 }], { at: Date.now() - DAY }));
+    const user = await renderApp('/settings');
+    await user.selectOptions(screen.getByLabelText('Training goal'), 'strength');
+    await waitFor(async () => expect((await getSetting('settings', DEFAULT_SETTINGS)).progressionGoal).toBe('strength'));
+    await user.selectOptions(screen.getByLabelText('Large weight jump threshold'), 'custom');
+    const custom = screen.getByLabelText('Custom large jump threshold (%)');
+    await user.clear(custom);
+    await user.type(custom, '12.5');
+    await user.tab();
+    await waitFor(async () => expect((await getSetting('settings', DEFAULT_SETTINGS)).largeJumpPercent).toBe(12.5));
+    expect(await exportData()).toMatchObject({ data: { settings: { progressionGoal: 'strength', largeJumpPercent: 12.5 } } });
+    await go(user, 'Exercises');
+    await user.click(screen.getByRole('link', { name: /Dumbbell Curl/ }));
+    expect(await screen.findByTestId('rec-regular')).toHaveTextContent('4 reps');
   });
 });
 

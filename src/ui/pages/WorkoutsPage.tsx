@@ -9,7 +9,7 @@ export function WorkoutsPage() {
   const nav = useNavigate();
 
   const open = (w: Workout, to: string) => {
-    app.setDraft(refreshRecommendations(w, app.exerciseById, app.sessions, app.settings.restScale, app.equipment));
+    app.setDraft(refreshRecommendations(w, app.exerciseById, app.sessions, app.settings.restScale, app.equipment, app.settings));
     nav(to);
   };
 

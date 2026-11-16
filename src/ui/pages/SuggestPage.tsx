@@ -13,7 +13,7 @@ export function SuggestPage() {
   const go = () => {
     const { workout, notes } = generateWorkout({
       exercises: app.exercises, equipment: app.equipment, ownedEquipment: app.owned, criteria, sessions: app.sessions,
-      status: app.status, restScale: app.settings.restScale,
+      status: app.status, restScale: app.settings.restScale, progression: app.settings,
     });
     setNotes(notes);
     if (workout.items.length) {

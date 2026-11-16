@@ -27,11 +27,11 @@ function ItemEditor({ workout, item, onChange, onClose }: {
   const [draft, setDraft] = useState(item);
   const timed = ex.kind === 'timed' || ex.kind === 'cardio' || draft.setType === 'hiit';
   const candidates = swapCandidates(workout, item, app.exercises, app.owned, app.status);
-  const rec = recommend(ex, item.setType, app.sessions, app.settings.restScale, Date.now(), app.equipment);
+  const rec = recommend(ex, item.setType, app.sessions, app.settings.restScale, Date.now(), app.equipment, app.settings);
 
   const swap = (next: Exercise) => {
     const base: PlanItem = { ...item, exerciseId: next.id, manual: false };
-    onChange(applyRecommendation(base, next, app.sessions, app.settings.restScale, Date.now(), app.equipment));
+    onChange(applyRecommendation(base, next, app.sessions, app.settings.restScale, Date.now(), app.equipment, app.settings));
     onClose();
   };
 
@@ -55,7 +55,7 @@ function ItemEditor({ workout, item, onChange, onClose }: {
       )}
       <div className="row">
         <button type="button" className="primary" onClick={() => { onChange({ ...draft, manual: true }); onClose(); }}>Apply</button>
-        <button type="button" onClick={() => { onChange(applyRecommendation({ ...item, manual: false }, ex, app.sessions, app.settings.restScale, Date.now(), app.equipment)); onClose(); }}>Reset to suggestion</button>
+        <button type="button" onClick={() => { onChange(applyRecommendation({ ...item, manual: false }, ex, app.sessions, app.settings.restScale, Date.now(), app.equipment, app.settings)); onClose(); }}>Reset to suggestion</button>
       </div>
       <p className="hint">Rest timers{item.setType === 'hiit' ? ' and the HIIT work time (the same for every exercise in the set)' : ''} are edited on the workout overview.</p>
       <ExerciseGuide ex={ex} />

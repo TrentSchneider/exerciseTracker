@@ -76,6 +76,7 @@ function SetForm({ item, lastLog, paused, onLog, onSkip }: {
       <label className="field">
         <span>Effort (RPE): {effort}/10</span>
         <input type="range" min={1} max={10} value={effort} onChange={(e) => setEffort(Number(e.target.value))} aria-label="Effort from 1 to 10" />
+        <small className="muted">Estimate how hard the set felt: 7 is the default, 10 is maximal. Your estimate helps guide suggestions.</small>
       </label>
       <fieldset className="plain row wrap" disabled={paused}>
         <button
