@@ -1,6 +1,7 @@
 import { generateWorkout, swapCandidates, isMachineCardio, fitsCriteria, hasEquipment } from './generator';
 import { computeMuscleStatus, primaryMuscles } from './fatigue';
 import { estimateWorkoutMinutes, buildBlocks } from './workout';
+import { displayToKg } from './units';
 import { byId, exercises, seeded, session, HOUR } from '../test/helpers';
 import type { Criteria } from '../types';
 
@@ -67,6 +68,22 @@ describe('generateWorkout', () => {
     });
     expect(result.workout.items).toHaveLength(1);
     expect(equipment[0].weightOptionsKg).toContain(result.workout.items[0].weightKg);
+  });
+
+  it('uses the maximum listed dumbbell weight and progresses reps in generated workouts', () => {
+    const weights = [5, 10, 15, 20, 25].map((lb) => displayToKg(lb, 'lb'));
+    const equipment = [{ id: 'dumbbell', name: 'Dumbbells', owned: true, weightOptionsKg: weights }];
+    const result = generateWorkout({
+      exercises: [byId.get('db_curl')!],
+      equipment,
+      ownedEquipment: ['dumbbell'],
+      criteria: base({ targetMuscles: ['biceps'], maxMinutes: 45 }),
+      sessions: [session('db_curl', [{ reps: 12, weightKg: weights[4], effort: 7 }], { at: NOW - HOUR })],
+      rng: seeded(7),
+    });
+    expect(result.workout.items).toHaveLength(1);
+    expect(result.workout.items[0].weightKg).toBe(weights[4]);
+    expect(result.workout.items[0].reps).toBe(14);
   });
 
   it('with no equipment falls back to bodyweight exercises', () => {

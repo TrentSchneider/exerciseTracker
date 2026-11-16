@@ -1,4 +1,5 @@
 import { applyRecommendation, exerciseHistory, recommend, recommendedRest } from './recommend';
+import { displayToKg, kgToDisplay } from './units';
 import { byId, DAY, session } from '../test/helpers';
 
 const NOW = 1_800_000_000_000;
@@ -53,6 +54,51 @@ describe('recommend', () => {
     expect(r.reps).toBe(dbCurl.repMin);
   });
 
+  it('preserves exact available pound weights for progression, holding, and reductions', () => {
+    const options = [5, 10, 15, 20, 25].map((lb) => displayToKg(lb, 'lb'));
+    const equipment = [{ id: 'dumbbell', name: 'Dumbbells', owned: true, weightOptionsKg: options }];
+    const cases = [
+      { reps: 12, weightKg: options[1], effort: 7, expected: 15 },
+      { reps: 10, weightKg: options[2], effort: 9, expected: 15 },
+      { reps: 8, weightKg: options[2], effort: 10, expected: 15 },
+    ];
+    for (const { expected, ...log } of cases) {
+      const history = [session('db_curl', [log], { at: NOW - DAY })];
+      const r = recommend(dbCurl, 'regular', history, 1, NOW, equipment);
+      expect(options).toContain(r.weightKg);
+      expect(kgToDisplay(r.weightKg, 'lb')).toBe(expected);
+    }
+  });
+
+  it('matches the intended weight increase with reps at the equipment limit on repeated sessions', () => {
+    const options = [5, 10, 15, 20, 25].map((lb) => displayToKg(lb, 'lb'));
+    const equipment = [{ id: 'dumbbell', name: 'Dumbbells', owned: true, weightOptionsKg: options }];
+    for (const reps of [12, 20]) {
+      const history = [session('db_curl', [{ reps, weightKg: options[4], effort: 7 }], { at: NOW - DAY })];
+      const r = recommend(dbCurl, 'regular', history, 1, NOW, equipment);
+      const intendedWeight = Math.round((options[4] + 1) * 2) / 2;
+      expect(r.weightKg).toBe(options[4]);
+      expect(r.reps).toBe(Math.ceil(reps * intendedWeight / options[4]));
+      expect(r.reason).toMatch(/increasing reps instead/i);
+    }
+  });
+
+  it('compensates with reps when previous equipment was heavier than the current maximum', () => {
+    const equipment = [{ id: 'dumbbell', name: 'Dumbbells', owned: true, weightOptionsKg: [5, 10, 15, 20, 25] }];
+    const history = [session('db_curl', [{ reps: 12, weightKg: 30, effort: 7 }], { at: NOW - DAY })];
+    const r = recommend(dbCurl, 'regular', history, 1, NOW, equipment);
+    expect(r.weightKg).toBe(25);
+    expect(r.reps).toBe(16);
+  });
+
+  it('does not increase equipment weight after a layoff', () => {
+    const equipment = [{ id: 'dumbbell', name: 'Dumbbells', owned: true, weightOptionsKg: [0.5, 1, 1.5, 2] }];
+    const history = [session('db_curl', [{ reps: 12, weightKg: 1, effort: 7 }], { at: NOW - 30 * DAY })];
+    const r = recommend(dbCurl, 'regular', history, 1, NOW, equipment);
+    expect(r.weightKg).toBe(1);
+    expect(r.reason).toMatch(/time away/i);
+  });
+
   it('increases time at the equipment limit, then reduces time when heavier equipment is added', () => {
     const weightedTimed = { ...plank, equipment: ['dumbbell'] };
     const s = [session('plank', [{ reps: 0, durationSec: 60, weightKg: 10, effort: 6 }], { at: NOW - DAY })];
@@ -65,6 +111,15 @@ describe('recommend', () => {
     expect(atLimit.durationSec).toBeGreaterThan(60);
     expect(withMoreWeight.weightKg).toBe(12.5);
     expect(withMoreWeight.durationSec).toBeLessThan(60);
+  });
+
+  it('does not increase timed exercise weight after a layoff', () => {
+    const weightedTimed = { ...plank, equipment: ['dumbbell'] };
+    const history = [session('plank', [{ reps: 0, durationSec: 60, weightKg: 10, effort: 6 }], { at: NOW - 30 * DAY })];
+    const equipment = [{ id: 'dumbbell', name: 'Dumbbells', owned: true, weightOptionsKg: [5, 10, 15] }];
+    const r = recommend(weightedTimed, 'regular', history, 1, NOW, equipment);
+    expect(r.weightKg).toBe(10);
+    expect(r.reason).toMatch(/time away/i);
   });
 
   it('holds weight at hard-but-ok effort', () => {

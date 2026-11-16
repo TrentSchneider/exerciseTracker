@@ -60,16 +60,17 @@ function closestWeight(options: number[], weight: number): number {
 
 function constrainWeight(
   options: number[], target: number, current: number, increasing: boolean,
-  reps: number, avgReps: number, repMax: number, reason: string,
+  reps: number, avgReps: number, reason: string, matchLoadWithReps = false,
 ): { weight: number; reps: number; reason: string } {
   if (!options.length) return { weight: target, reps, reason };
   if (increasing) {
     const next = options.find((option) => option > current + 0.001);
     if (next !== undefined) return { weight: next, reps, reason };
+    const maxWeight = options[options.length - 1];
     return {
-      weight: options[options.length - 1],
-      reps: Math.max(reps, repMax + 1, Math.round(avgReps) + 1),
-      reason: `${reason} Equipment limit reached — increasing reps instead.`,
+      weight: maxWeight,
+      reps: Math.max(reps, Math.round(avgReps) + 1, matchLoadWithReps ? Math.ceil(avgReps * target / maxWeight - 1e-10) : 0),
+      reason: 'Equipment limit reached — increasing reps instead.',
     };
   }
   return { weight: closestWeight(options, target), reps, reason };
@@ -129,8 +130,8 @@ export function recommend(
         rec.durationSec = Math.max(10, Math.round((avgDur * 0.9 * layoff) / 5) * 5);
         rec.reason = 'Easy at this load — increasing weight and reducing time.';
       } else {
-        rec.weightKg = avgEffort <= 7 ? weights[weights.length - 1] : closestWeight(weights, currentWeight);
-        if (avgEffort <= 7) rec.reason = 'Equipment limit reached — increasing time instead.';
+        rec.weightKg = closestWeight(weights, currentWeight);
+        if (avgEffort <= 7 && layoff === 1 && nextWeight === undefined) rec.reason = 'Equipment limit reached — increasing time instead.';
       }
       rec.bodyweight = false;
     }
@@ -155,9 +156,14 @@ export function recommend(
       reps = Math.min(ex.repMax, reps + (avgEffort <= 7 ? 2 : 1));
       rec.reason = 'Room to spare — adding reps.';
     } else rec.reason = 'Holding at last performance.';
-    if (layoff < 1) { reps = Math.max(1, Math.round(reps * layoff)); rec.reason = 'Time away — reduced reps.'; }
+    if (layoff < 1) {
+      if (increasing) added = topWeight * scale;
+      reps = Math.max(1, Math.round(reps * layoff));
+      increasing = false;
+      rec.reason = 'Time away — reduced reps.';
+    }
     if (weights.length && (added > 0 || topWeight > 0)) {
-      const constrained = constrainWeight(weights, added, topWeight * scale, increasing, reps, avgReps, ex.repMax, rec.reason);
+      const constrained = constrainWeight(weights, added, topWeight * scale, increasing, reps, avgReps, rec.reason);
       added = constrained.weight;
       reps = constrained.reps;
       rec.reason = constrained.reason;
@@ -187,9 +193,13 @@ export function recommend(
     reps = Math.min(ex.repMax, reps + 1);
     rec.reason = 'Room to spare — adding a rep.';
   } else rec.reason = 'Holding at last performance.';
-  if (layoff < 1) { weight = roundHalf(weight * layoff); rec.reason = 'Time away — reduced weight.'; }
-  const constrained = constrainWeight(weights, Math.max(0, roundHalf(weight)), topWeight * scale, increasing, reps, avgReps, ex.repMax, rec.reason);
-  rec.weightKg = Math.max(0, roundHalf(constrained.weight));
+  if (layoff < 1) {
+    weight = roundHalf((increasing ? topWeight * scale : weight) * layoff);
+    increasing = false;
+    rec.reason = 'Time away — reduced weight.';
+  }
+  const constrained = constrainWeight(weights, Math.max(0, roundHalf(weight)), topWeight * scale, increasing, reps, avgReps, rec.reason, true);
+  rec.weightKg = Math.max(0, constrained.weight);
   reps = constrained.reps;
   rec.reps = Math.max(1, reps);
   rec.bodyweight = false;
