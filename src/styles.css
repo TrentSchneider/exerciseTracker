@@ -723,6 +723,7 @@ fieldset.plain {
 }
 .work-field {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
@@ -731,6 +732,10 @@ fieldset.plain {
 }
 .work-field input {
   width: 5rem;
+  min-width: 0;
+}
+.work-field > span:last-child {
+  flex: none;
 }
 
 @media (min-width: 800px) {
@@ -878,6 +883,34 @@ fieldset.plain {
   font-weight: 700;
   color: var(--accent);
 }
+.active-item {
+  flex-wrap: wrap;
+}
+.active-item > span:first-child {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.active-item > button {
+  flex: none;
+}
+.workout-header,
+.planner-header,
+.current > .row-between {
+  flex-wrap: wrap;
+}
+.workout-header > .row,
+.planner-header > .seg,
+.current > .row-between > .badge {
+  flex: none;
+}
+.workout-header > h1 {
+  flex: 1 1 12rem;
+}
+.current > .row-between > h2 {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
 
 /* Exercise guide */
 .exercise-guide .steps {
@@ -915,6 +948,13 @@ fieldset.plain {
 @media (max-width: 480px) {
   .rest-col {
     flex-basis: 5.2rem;
+  }
+  .field.inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .work-field > span:first-child {
+    flex: 1 1 100%;
   }
 }
 

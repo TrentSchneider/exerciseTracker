@@ -166,7 +166,7 @@ export function ActiveWorkoutPage() {
 
   return (
     <section className="stack">
-      <div className="row-between">
+      <div className="row-between workout-header">
         <h1>{a.name}</h1>
         <div className="row">
           <span className="muted" aria-label="Elapsed time">{formatDuration(elapsed)}</span>

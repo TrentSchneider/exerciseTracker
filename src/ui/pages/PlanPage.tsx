@@ -181,7 +181,7 @@ export function PlanPage() {
 
   return (
     <section className="stack">
-      <div className="row-between">
+      <div className="row-between planner-header">
         <h1>Planner</h1>
         <div className="seg" role="group" aria-label="Planner view">
           {(['list', 'calendar'] as const).map((v) => (
