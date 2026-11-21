@@ -26,6 +26,7 @@ export function MuscleStatsPanel({ status, onClose }: { status: MuscleStatus; on
         <dd>{status.sets7d.regular} regular · {status.sets7d.superset} superset · {status.sets7d.hiit} HIIT</dd>
         <dt>Volume (7 days)</dt><dd>{formatWeight(status.volume7dKg, app.settings.units)}</dd>
       </dl>
+      <Link to={`/progress?view=muscle&muscle=${status.muscle}`}>View muscle progress</Link>
       {status.topExercises.length > 0 && (
         <>
           <h3>Most used exercises (7 days)</h3>

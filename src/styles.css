@@ -1032,6 +1032,27 @@ fieldset.plain.active-exercise-list {
 .chip:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .seg { display: flex; gap: 0.4rem; }
+.progress-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 0.75rem;
+}
+.progress-filters .field.inline {
+  flex-direction: column;
+  align-items: stretch;
+}
+.progress-filters select {
+  min-width: 0;
+  max-width: 100%;
+}
+.progress-page h2,
+.progress-page .list,
+.progress-page .stats dd {
+  overflow-wrap: anywhere;
+}
+.progress-page .stats {
+  grid-template-columns: auto minmax(0, 1fr);
+}
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-head { text-align: center; font-size: 0.75rem; color: var(--muted); }
 .cal-cell { min-height: 44px; padding: 0.2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 8px; }

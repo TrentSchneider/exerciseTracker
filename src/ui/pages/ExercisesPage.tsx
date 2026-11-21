@@ -137,6 +137,7 @@ export function ExerciseDetailPage() {
       <Link to="/exercises"><Icon name="left" size={16} /> All exercises</Link>
       <h1>{ex.name}</h1>
       <p className="muted">{primaryMuscles(ex).map((x) => MUSCLE_LABELS[x]).join(', ')}</p>
+      <Link to={`/progress?view=exercise&exercise=${encodeURIComponent(ex.id)}`}>View exercise progress</Link>
       <label className="check">
         <input type="checkbox" checked={!ex.inactive} onChange={(e) => app.saveExercise({ ...ex, inactive: !e.target.checked })} />
         Active (include in generated workouts)

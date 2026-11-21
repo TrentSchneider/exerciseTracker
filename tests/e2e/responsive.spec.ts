@@ -99,6 +99,88 @@ for (const width of [320, 375, 480]) {
   });
 }
 
+for (const width of [320, 375, 480, 800, 1440]) {
+  test(`progress charts and filters fit at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 640 });
+    await page.goto('./#/progress');
+    await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible();
+    const name = 'ExtraordinarilyLongUnbrokenExerciseNameForNarrowScreenTesting';
+    await page.evaluate(async (exerciseName) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('workout-tracker');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const tx = db.transaction(['exercises', 'sessions'], 'readwrite');
+      tx.objectStore('exercises').put({
+        id: 'responsive-progress', name: exerciseName, kind: 'weighted', equipment: [],
+        muscles: { chest: 1 }, supersetOk: true, hiitOk: false, repMin: 5, repMax: 10, restSec: 60,
+      });
+      for (const [index, weight] of [0, 1234567].entries()) {
+        const at = Date.now() - (8 - index * 7) * 86400000;
+        tx.objectStore('sessions').put({
+          id: `responsive-${index}`, name: 'Workout', startedAt: at, completedAt: at, durationSec: 60,
+          exercises: [{ itemId: 'item', exerciseId: 'responsive-progress', setType: 'regular', skipped: false,
+            sets: [{ reps: 10, weightKg: weight, bodyweight: false, durationSec: 0, effort: 7, at }] }],
+        });
+      }
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    }, name);
+    await page.goto('./#/progress?view=exercise&exercise=responsive-progress');
+    await page.reload();
+    await expect(page.getByRole('heading', { name: new RegExp(name) })).toBeVisible();
+    await page.getByRole('combobox', { name: 'Metric' }).selectOption('volume');
+    const progressLink = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Progress', exact: true });
+    const exerciseIcon = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Exercises', exact: true }).locator('svg').innerHTML();
+    expect(await progressLink.locator('svg').innerHTML()).not.toBe(await exerciseIcon);
+    if (width < 800) {
+      const nav = page.getByRole('navigation', { name: 'Main' });
+      await expect.poll(async () => {
+        const bar = await nav.boundingBox();
+        const link = await progressLink.boundingBox();
+        return !!bar && !!link && link.x >= bar.x - 1 && link.x + link.width <= bar.x + bar.width + 1;
+      }).toBe(true);
+    }
+    await expectLayoutFits(page);
+    const chart = page.locator('.progress-page svg.chart');
+    await expect(chart).toBeVisible();
+    await expect.poll(() => chart.evaluate((svg) => {
+      const bounds = svg.getBoundingClientRect();
+      return [...svg.querySelectorAll('text')].every((label) => {
+        const rect = label.getBoundingClientRect();
+        return rect.height >= 10 && rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1;
+      });
+    })).toBe(true);
+    if (width === 800) {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await expect.poll(() => chart.evaluate((svg) => {
+        const viewWidth = svg.viewBox.baseVal.width;
+        return Math.abs(viewWidth - svg.getBoundingClientRect().width) < 1;
+      })).toBe(true);
+      await expect.poll(async () => {
+        const bar = await page.getByRole('navigation', { name: 'Main' }).boundingBox();
+        const link = await progressLink.boundingBox();
+        return !!bar && !!link && link.x >= bar.x - 1 && link.x + link.width <= bar.x + bar.width + 1;
+      }).toBe(true);
+    }
+    await page.getByRole('button', { name: 'Muscle', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Metric' }).selectOption('volume');
+    await expect(page.getByRole('list', { name: 'Muscle weekly values' })).toBeVisible();
+    await expectLayoutFits(page);
+    await expect.poll(() => chart.evaluate((svg) => {
+      const bounds = svg.getBoundingClientRect();
+      return [...svg.querySelectorAll('text')].every((label) => {
+        const rect = label.getBoundingClientRect();
+        return rect.height >= 10 && rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1;
+      });
+    })).toBe(true);
+  });
+}
+
 for (const setType of ['Superset', 'HIIT']) {
   test(`${setType} with long exercise names fits at 320px`, async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });

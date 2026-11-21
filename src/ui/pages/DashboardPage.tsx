@@ -176,6 +176,7 @@ export function DashboardPage() {
             <p className="muted">No workouts logged yet.</p>
           )}
           <Link to="/history">View history</Link>
+          <Link to="/progress">View progress</Link>
         </div>
       </div>
 

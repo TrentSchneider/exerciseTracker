@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { HashRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { Icon, type IconName } from './ui/components/Icon';
 import { AppProvider, useApp } from './ui/AppContext';
@@ -14,6 +14,7 @@ import { PreviewPage } from './ui/pages/PreviewPage';
 import { SettingsPage } from './ui/pages/SettingsPage';
 import { SuggestPage } from './ui/pages/SuggestPage';
 import { WorkoutsPage } from './ui/pages/WorkoutsPage';
+import { ProgressPage } from './ui/pages/ProgressPage';
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: 'Home', icon: 'home', end: true },
@@ -21,7 +22,8 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/workouts', label: 'Workouts', icon: 'dumbbell' },
   { to: '/plan', label: 'Planner', icon: 'calendar' },
   { to: '/history', label: 'History', icon: 'history' },
-  { to: '/exercises', label: 'Exercises', icon: 'chart' },
+  { to: '/progress', label: 'Progress', icon: 'chart' },
+  { to: '/exercises', label: 'Exercises', icon: 'exercises' },
   { to: '/equipment', label: 'Equipment', icon: 'toolbox' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
@@ -34,10 +36,27 @@ function ScrollToTop() {
 
 function Shell() {
   const app = useApp();
+  const { pathname } = useLocation();
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const revealActive = () => {
+      const bar = nav.current;
+      if (!bar || getComputedStyle(bar).flexDirection !== 'row') return;
+      const active = bar.querySelector<HTMLElement>('.nav-link.active');
+      if (!active) return;
+      const bounds = bar.getBoundingClientRect();
+      const link = active.getBoundingClientRect();
+      if (link.left < bounds.left) bar.scrollLeft -= bounds.left - link.left;
+      else if (link.right > bounds.right) bar.scrollLeft += link.right - bounds.right;
+    };
+    revealActive();
+    window.addEventListener('resize', revealActive);
+    return () => window.removeEventListener('resize', revealActive);
+  }, [app.ready, !!app.active, pathname]);
   if (!app.ready) return <p className="loading">Loading…</p>;
   return (
     <div className="shell">
-      <nav className="nav" aria-label="Main">
+      <nav ref={nav} className="nav" aria-label="Main">
         <div className="brand">Workout Tracker</div>
         {app.active && (
           <NavLink to="/workout" className="nav-link live"><Icon name="play" /><span>In progress</span></NavLink>
@@ -61,6 +80,7 @@ function Shell() {
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/history/:id" element={<SessionDetailPage />} />
+          <Route path="/progress" element={<ProgressPage />} />
           <Route path="/exercises" element={<ExercisesPage />} />
           <Route path="/exercises/:id" element={<ExerciseDetailPage />} />
           <Route path="/equipment" element={<EquipmentPage />} />

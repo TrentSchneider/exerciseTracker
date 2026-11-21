@@ -5,6 +5,7 @@ const PATHS = {
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>,
   history: <><path d="M3 12a9 9 0 1 0 3-6.700L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></>,
   chart: <path d="M3 3v18h18M7 15l4-4 3 3 6-7" />,
+  exercises: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h.01M11 8h5M8 12h.01M11 12h5M8 16h.01M11 16h5" /></>,
   toolbox: <><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M9 8V5h6v3M3 13h18" /></>,
   settings: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.900 4.900l2.100 2.100M17 17l2.100 2.100M4.900 19.100L7 17M17 7l2.100-2.100" /></>,
   play: <path d="M7 4l13 8-13 8z" />,

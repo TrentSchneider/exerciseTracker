@@ -23,6 +23,15 @@ test('loads, shows body diagram, and runs a suggested workout end to end', async
   await page.getByRole('button', { name: 'Skip rest' }).click();
   await page.getByRole('button', { name: 'Finish workout' }).click();
 
+  await expect(page.getByRole('heading', { name: 'Completed sets' }).first()).toBeVisible();
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Progress', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Exercise recorded values' })).toBeVisible();
+  await page.getByRole('button', { name: 'Muscle', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Muscle', exact: true })).toBeVisible();
+  await page.getByLabel('Time range').selectOption('4w');
+  await expect(page.getByRole('heading', { name: /training/ })).toBeVisible();
+
   await page.goto('./#/history');
   await expect(page.getByLabel('Search history')).toBeVisible();
   await expect(page.getByRole('link').filter({ hasText: /workout/i }).first()).toBeVisible();
@@ -82,7 +91,7 @@ test('persists data in IndexedDB across reloads', async ({ page }) => {
 });
 
 test('layout has no horizontal overflow', async ({ page }) => {
-  for (const hash of ['', '#/workouts', '#/history', '#/settings', '#/exercises']) {
+  for (const hash of ['', '#/workouts', '#/history', '#/settings', '#/exercises', '#/progress']) {
     await page.goto('./' + hash);
     await page.waitForLoadState('networkidle');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
