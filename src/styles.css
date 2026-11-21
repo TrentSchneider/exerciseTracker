@@ -883,6 +883,74 @@ fieldset.plain {
   font-weight: 700;
   color: var(--accent);
 }
+.active-summary {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 10;
+  max-height: calc(100vh - 8rem);
+  max-height: calc(100dvh - 8rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.active-controls {
+  min-height: 4rem;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.active-summary .stack {
+  gap: 0.35rem;
+}
+.active-summary .grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.active-summary .timer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.35rem;
+}
+.active-summary .timer-display {
+  font-size: 1.6rem;
+}
+.active-summary .timer-row {
+  grid-column: 1 / -1;
+  gap: 0.25rem;
+}
+.active-summary .timer-edit input {
+  width: 4rem;
+}
+.active-summary .effort-field {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+}
+.active-summary .effort-field input {
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+}
+.active-summary .effort-field small {
+  grid-column: 1 / -1;
+}
+.active-summary fieldset.row button {
+  padding-inline: 0.45rem;
+}
+.overview .card.overview-current {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.overview .card.overview-completed,
+.overview .card.overview-skipped {
+  opacity: 0.65;
+}
+fieldset.plain.active-exercise-list {
+  padding: 0.75rem;
+  background: transparent;
+}
+.active-exercise-list .overview .card {
+  background: var(--panel-2);
+}
 .active-item {
   flex-wrap: wrap;
 }

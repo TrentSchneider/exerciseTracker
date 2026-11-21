@@ -130,6 +130,38 @@ test('sticky modal header, pause, and active-workout guide', async ({ page }) =>
   await page.keyboard.press('Escape');
 
   await page.getByRole('button', { name: 'Start workout' }).click();
+  const summary = page.locator('.active-summary');
+  await expect(summary).toBeVisible();
+  await expect(summary.locator('.active-controls')).toBeVisible();
+  for (const element of [summary, summary.locator('.active-controls')]) {
+    expect(await element.evaluate((el) => ({ x: el.scrollWidth - el.clientWidth, y: el.scrollHeight - el.clientHeight }))).toEqual({ x: 0, y: 0 });
+  }
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect.poll(async () => (await summary.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+  await expect.poll(async () => (await summary.boundingBox())!.y).toBeLessThan(20);
+  const remaining = page.getByRole('heading', { name: 'Remaining exercises' }).locator('xpath=../..');
+  const remainingList = remaining.locator('.active-exercise-list');
+  const remainingCard = remainingList.locator('.block-row > .card').first();
+  const [listBounds, cardBounds] = [await remainingList.boundingBox(), await remainingCard.boundingBox()];
+  expect(cardBounds!.x - listBounds!.x).toBeGreaterThanOrEqual(12);
+  expect(cardBounds!.y - listBounds!.y).toBeGreaterThanOrEqual(12);
+  await page.getByRole('button', { name: 'View all exercises' }).click();
+  const allExercises = page.getByRole('dialog', { name: 'All exercises' });
+  await expect(allExercises.locator('.overview-current')).toBeVisible();
+  const modalList = allExercises.locator('.active-exercise-list');
+  const modalCard = modalList.locator('.block-row > .card').first();
+  const [modalListBounds, modalCardBounds] = [await modalList.boundingBox(), await modalCard.boundingBox()];
+  expect(modalCardBounds!.x - modalListBounds!.x).toBeGreaterThanOrEqual(12);
+  expect(modalCardBounds!.y - modalListBounds!.y).toBeGreaterThanOrEqual(12);
+  await expect(remainingCard).toHaveClass(/overview-current/);
+  await expect(modalCard).toHaveClass(/overview-current/);
+  expect(await modalCard.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .toBe(await remainingCard.evaluate((el) => getComputedStyle(el).backgroundColor));
+  await allExercises.getByRole('button', { name: /^About / }).first().click();
+  await expect(page.getByTestId('exercise-guide')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(allExercises).toBeVisible();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: /^About / }).first().click();
   await expect(page.getByTestId('exercise-guide')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -141,6 +173,40 @@ test('sticky modal header, pause, and active-workout guide', async ({ page }) =>
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Resume workout' }).click();
   await expect(page.getByRole('button', { name: 'Complete set' })).toBeEnabled();
+});
+
+test('sticky exercise card keeps workout and rest controls accessible while scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('./#/suggest');
+  await page.getByRole('button', { name: 'Regular sets' }).click();
+  await page.getByRole('button', { name: 'HIIT' }).click();
+  await page.getByRole('button', { name: 'Suggest workout' }).click();
+  await page.getByRole('button', { name: 'Start workout' }).click();
+  const card = page.locator('.active-summary');
+  await expect(card.getByRole('button', { name: 'Complete set' })).toBeEnabled({ timeout: 10000 });
+  for (const element of [card, card.locator('.active-controls')]) {
+    expect(await element.evaluate((el) => ({ x: el.scrollWidth - el.clientWidth, y: el.scrollHeight - el.clientHeight }))).toEqual({ x: 0, y: 0 });
+  }
+  await expect(card.getByText(/^Round 1 of/)).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  await expect.poll(async () => (await card.boundingBox())!.y).toBeLessThan(20);
+  await expect(card.getByRole('timer', { name: 'Work interval' })).toBeAttached();
+  await card.getByLabel('Time done (s)').fill('35');
+  await card.getByLabel('Effort from 1 to 10').fill('8');
+  await card.getByRole('button', { name: 'Complete set' }).click();
+  await expect(page.getByText('1 of', { exact: false }).first()).toBeAttached();
+  await expect.poll(async () => (await card.boundingBox())!.y).toBeLessThan(20);
+  await card.getByRole('button', { name: 'Complete set' }).click();
+  await card.getByRole('button', { name: 'Complete set' }).click();
+  await expect(card.getByRole('timer', { name: 'Rest' })).toBeAttached();
+  for (const element of [card, card.locator('.active-controls')]) {
+    expect(await element.evaluate((el) => ({ x: el.scrollWidth - el.clientWidth, y: el.scrollHeight - el.clientHeight }))).toEqual({ x: 0, y: 0 });
+  }
+  await card.getByRole('button', { name: 'Skip rest' }).click();
+  await expect(card.getByRole('timer', { name: 'Work interval' })).toBeAttached();
+  await expect.poll(async () => (await card.boundingBox())!.y).toBeLessThan(20);
 });
 
 test('HIIT auto-advance setting persists', async ({ page }) => {

@@ -1,5 +1,9 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { go, ownEquipment, renderApp } from '../test/ui';
+import { ACTIVE_SESSION_KEY, setSetting } from '../db/db';
+import { startSession } from '../domain/session';
+import { newWorkout } from '../domain/workout';
+import type { PlanItem, SetType } from '../types';
 
 beforeEach(() => {
   vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -176,6 +180,101 @@ describe('active workout grouping', () => {
     await user.click(screen.getByRole('button', { name: 'Complete set' }));
     expect(await screen.findByRole('timer', { name: 'Rest' })).toBeInTheDocument();
     expect(screen.getByText('Rest between sets/rounds')).toBeInTheDocument();
+  });
+});
+
+describe('active workout remaining exercises', () => {
+  const planItem = (id: string, exerciseId: string, overrides: Partial<PlanItem> = {}): PlanItem => ({
+    id, exerciseId, setType: 'regular', sets: 1, reps: 10, weightKg: 0, bodyweight: true,
+    durationSec: 30, restSec: 0, transitionSec: 0, ...overrides,
+  });
+
+  async function start(type: SetType) {
+    const items = [
+      planItem('first', 'pushup'),
+      planItem('group-a', 'bw_squat', { setType: type, group: 'A', sets: 2 }),
+      planItem('group-b', 'crunch', { setType: type, group: 'A', sets: 2 }),
+      planItem('last', 'plank'),
+    ];
+    await setSetting(ACTIVE_SESSION_KEY, startSession(newWorkout('Test workout', items), Date.now() - 10_000));
+    const user = await renderApp('/workout');
+    await screen.findByTestId('set-form');
+    return user;
+  }
+
+  it.each(['superset', 'hiit'] as const)('hides a completed regular exercise and keeps a %s until every final-round exercise is done', async (type) => {
+    const user = await start(type);
+    const remaining = () => screen.getByRole('heading', { name: 'Remaining exercises' }).parentElement!.parentElement!;
+    expect(within(remaining()).getByRole('button', { name: 'About Push-up' })).toBeInTheDocument();
+    expect(within(remaining()).getByRole('button', { name: 'About Push-up' }).closest('.card')).toHaveClass('overview-current');
+    expect(within(remaining()).getByRole('button', { name: 'About Plank' }).closest('.card')).toHaveClass('overview-upcoming');
+
+    await user.click(screen.getByRole('button', { name: 'Complete set' }));
+    await waitFor(() => expect(within(remaining()).queryByRole('button', { name: 'About Push-up' })).toBeNull());
+    await user.click(screen.getByRole('button', { name: 'View all exercises' }));
+    let dialog = screen.getByRole('dialog', { name: 'All exercises' });
+    const completed = within(dialog).getByRole('button', { name: 'About Push-up' }).closest('.card')!;
+    const current = within(dialog).getByRole('button', { name: 'About Bodyweight Squat' }).closest('.card')!;
+    expect(completed).toHaveClass('overview-completed');
+    expect(current).toHaveClass('overview-current');
+    const upcoming = within(dialog).getByRole('button', { name: 'About Plank' }).closest('.card') as HTMLElement;
+    expect(upcoming).toHaveClass('overview-upcoming');
+    expect(within(upcoming).getByText('Upcoming')).toBeInTheDocument();
+    await user.click(within(completed as HTMLElement).getByRole('button', { name: 'About Push-up' }));
+    expect(screen.getByRole('dialog', { name: 'Push-up' })).toBeInTheDocument();
+    await user.click(within(screen.getByRole('dialog', { name: 'Push-up' })).getByRole('button', { name: 'Close' }));
+    dialog = screen.getByRole('dialog', { name: 'All exercises' });
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+
+    for (let i = 0; i < 3; i++) {
+      await user.click(screen.getByRole('button', { name: 'Complete set' }));
+      await waitFor(() => expect(screen.getByText(`${i + 2} of 6 sets complete`)).toBeInTheDocument());
+    }
+    expect(within(remaining()).getByRole('button', { name: 'About Bodyweight Squat' })).toBeInTheDocument();
+    expect(within(remaining()).getByRole('button', { name: 'About Crunch' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Complete set' }));
+    await waitFor(() => expect(within(remaining()).queryByRole('button', { name: 'About Crunch' })).toBeNull());
+    expect(within(remaining()).getByRole('button', { name: 'About Plank' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'View all exercises' }));
+    dialog = screen.getByRole('dialog', { name: 'All exercises' });
+    expect(within(dialog).getByRole('button', { name: 'About Crunch' }).closest('.card')).toHaveClass('overview-completed');
+    expect(within(dialog).getByRole('button', { name: 'About Plank' }).closest('.card')).toHaveClass('overview-current');
+  });
+
+  it('keeps skipped exercises recoverable in the full list', async () => {
+    const user = await start('superset');
+    await user.click(screen.getByRole('button', { name: 'Skip exercise' }));
+    const remaining = screen.getByRole('heading', { name: 'Remaining exercises' }).parentElement!.parentElement!;
+    await waitFor(() => expect(within(remaining).queryByRole('button', { name: 'About Push-up' })).toBeNull());
+    await user.click(screen.getByRole('button', { name: 'View all exercises' }));
+    const dialog = screen.getByRole('dialog', { name: 'All exercises' });
+    expect(within(dialog).getByRole('button', { name: 'About Push-up' }).closest('.card')).toHaveClass('overview-skipped');
+    await user.click(within(dialog).getByRole('button', { name: 'Undo skip' }));
+    expect(within(dialog).getByRole('button', { name: 'About Push-up' }).closest('.card')).toHaveClass('overview-current');
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(within(remaining).getByRole('button', { name: 'About Push-up' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Skip exercise' }));
+    await user.click(screen.getByRole('button', { name: 'Complete set' }));
+    await user.click(screen.getByRole('button', { name: 'View all exercises' }));
+    const skippedCard = within(screen.getByRole('dialog', { name: 'All exercises' }))
+      .getByRole('button', { name: 'About Push-up' }).closest('.card') as HTMLElement;
+    expect(within(skippedCard).queryByRole('button', { name: 'Undo skip' })).toBeNull();
+    expect(within(skippedCard).getAllByText('Skipped').length).toBeGreaterThan(0);
+  });
+
+  it('preserves hidden exercises when editing a remaining block', async () => {
+    const user = await start('superset');
+    await user.click(screen.getByRole('button', { name: 'Complete set' }));
+    await waitFor(() => expect(screen.getByText('1 of 6 sets complete')).toBeInTheDocument());
+    const rest = screen.getByRole('spinbutton', { name: /Rest between rounds: Bodyweight Squat/ });
+    await user.clear(rest);
+    await user.type(rest, '15');
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: 'View all exercises' }));
+    const dialog = screen.getByRole('dialog', { name: 'All exercises' });
+    expect(within(dialog).getByRole('button', { name: 'About Push-up' }).closest('.card')).toHaveClass('overview-completed');
+    expect(within(dialog).getByRole('spinbutton', { name: /Rest between rounds: Bodyweight Squat/ })).toHaveValue(15);
   });
 });
 

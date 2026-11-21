@@ -24,13 +24,15 @@ function RestInput({ label, value, onChange }: { label: string; value: number; o
  * (rest belongs to the set/round, not to an exercise); the rest between exercises sits between cards.
  * When `onChangeItems` is omitted the rests are shown read-only.
  */
-export function WorkoutOverview({ items, byId, renderItem, onChangeItems }: {
+export function WorkoutOverview({ items, byId, renderItem, onChangeItems, includeBlock, blockStatus }: {
   items: PlanItem[];
   byId: Map<string, Exercise>;
   renderItem: (item: PlanItem, ex: Exercise | undefined) => ReactNode;
   onChangeItems?: (items: PlanItem[]) => void;
+  includeBlock?: (block: PlanItem[]) => boolean;
+  blockStatus?: (block: PlanItem[]) => 'current' | 'completed' | 'skipped' | 'upcoming';
 }) {
-  const blocks = buildBlocks(items);
+  const blocks = buildBlocks(items).filter((block) => !includeBlock || includeBlock(block));
   return (
     <div className="overview">
       {blocks.map((block, bi) => {
@@ -38,10 +40,12 @@ export function WorkoutOverview({ items, byId, renderItem, onChangeItems }: {
         const names = block.map((i) => byId.get(i.exerciseId)?.name ?? i.exerciseId).join(' + ');
         const unit = grouped ? 'rounds' : 'sets';
         const rest = blockRest(block);
+        const status = blockStatus?.(block);
         return (
-          <div key={bi}>
+          <div key={block[0].id}>
             <div className="block-row">
-              <div className={`card ${grouped ? `block bracket ${block[0].setType}` : ''}`} data-testid={grouped ? 'bracket' : 'single'}>
+              <div className={`card ${grouped ? `block bracket ${block[0].setType}` : ''} ${status ? `overview-${status}` : ''}`} data-testid={grouped ? 'bracket' : 'single'}>
+                {status && <span className="hint">{status === 'current' ? 'Current' : status === 'completed' ? 'Completed' : status === 'skipped' ? 'Skipped' : 'Upcoming'}</span>}
                 {grouped && <div className="badge">{SET_TYPE_LABELS[block[0].setType]} — {block[0].sets} rounds</div>}
                 {block[0].setType === 'hiit' && (
                   <label className="work-field" data-testid="hiit-work">

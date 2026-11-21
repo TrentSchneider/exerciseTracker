@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { activeSeconds, currentStep, isLastStep, logSet, pauseSession, progress, resumeSession, skipExercise, undoSkip, type ActiveSession } from '../../domain/session';
 import { formatDuration, formatWeight } from '../../domain/units';
-import { primaryMuscles } from '../../domain/fatigue';
-import { MUSCLE_LABELS, type Exercise, type PlanItem, type SetLog } from '../../types';
+import { type Exercise, type PlanItem, type SetLog } from '../../types';
 import { useApp } from '../AppContext';
 import { Timer } from '../components/Timer';
 import { useCountdown } from '../audio';
@@ -13,6 +12,7 @@ import { ExerciseInfoModal } from '../components/ExerciseInfoModal';
 import { NumberField, SET_TYPE_LABELS, WeightField } from '../components/Fields';
 import { blockRest, blockTransition, buildBlocks } from '../../domain/workout';
 import { WorkoutOverview } from '../components/WorkoutOverview';
+import { Modal } from '../components/Modal';
 
 // Not a native <button> so it stays usable inside the disabled (paused) fieldset: the guide is read-only.
 type InfoTarget = { ex: Exercise; itemId?: string };
@@ -73,10 +73,10 @@ function SetForm({ item, lastLog, paused, onLog, onSkip }: {
           Used body weight
         </label>
       )}
-      <label className="field">
+      <label className="field effort-field">
         <span>Effort (RPE): {effort}/10</span>
         <input type="range" min={1} max={10} value={effort} onChange={(e) => setEffort(Number(e.target.value))} aria-label="Effort from 1 to 10" />
-        <small className="muted">Estimate how hard the set felt: 7 is the default, 10 is maximal. Your estimate helps guide suggestions.</small>
+        <small className="muted">7 is the default; 10 is maximal.</small>
       </label>
       <fieldset className="plain row wrap" disabled={paused}>
         <button
@@ -98,6 +98,7 @@ export function ActiveWorkoutPage() {
   const [rest, setRest] = useState<{ seconds: number; key: number; kind: 'set' | 'exercise' } | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [info, setInfo] = useState<InfoTarget | null>(null);
+  const [showExercises, setShowExercises] = useState(false);
   const [startCount, setStartCount] = useState(() => !!a && !a.pausedAt && a.cursor === 0 && Date.now() - a.startedAt < 5000);
   const [resuming, setResuming] = useState(false);
   const startN = useCountdown(startCount, () => setStartCount(false));
@@ -159,10 +160,45 @@ export function ActiveWorkoutPage() {
     nav('/');
   };
 
-  const nextItem = () => {
-    const i = a.steps.findIndex((s, idx) => idx >= a.cursor && !a.skipped.includes(s.itemId));
-    return i >= 0 ? a.items.find((it) => it.id === a.steps[i].itemId) : undefined;
+  const remainingIds = new Set(a.steps.slice(a.cursor).filter((s) => !a.skipped.includes(s.itemId)).map((s) => s.itemId));
+  const futureIds = new Set(a.steps.slice(a.cursor).map((s) => s.itemId));
+  const hasRemaining = (block: PlanItem[]) => block.some((it) => remainingIds.has(it.id));
+  const blockStatus = (block: PlanItem[]) => {
+    if (block.some((it) => it.id === step?.itemId)) return 'current' as const;
+    if (hasRemaining(block)) return 'upcoming' as const;
+    return block.every((it) => (a.logs[it.id]?.length ?? 0) >= it.sets) ? 'completed' as const : 'skipped' as const;
   };
+  const overview = (all: boolean) => (
+    <WorkoutOverview
+      items={a.items} byId={app.exerciseById} onChangeItems={(items) => commit({ ...a, items })}
+      includeBlock={all ? undefined : hasRemaining} blockStatus={blockStatus}
+      renderItem={(it, e) => {
+        const n = a.logs[it.id]?.length ?? 0;
+        const skipped = a.skipped.includes(it.id);
+        return (
+          <div className={`row-between active-item ${item?.id === it.id ? 'is-current' : ''}`}>
+            <span className={skipped ? 'struck' : ''}>
+              {e ? <InfoLink ex={e} itemId={it.id} onOpen={setInfo} /> : it.exerciseId} <small>({n}/{it.sets})</small>
+              {(a.logs[it.id] ?? []).map((l, i) => (
+                <small key={i} className="set-line muted" style={{ display: 'block' }}>
+                  Set {i + 1}: {formatSetValues(l, e, app.settings.units)}
+                </small>
+              ))}
+            </span>
+            {skipped && futureIds.has(it.id) ? (
+              <button type="button" onClick={() => commit(undoSkip(a, it.id))}>Undo skip</button>
+            ) : skipped ? (
+              <span className="hint">Skipped</span>
+            ) : n < it.sets && remainingIds.has(it.id) ? (
+              <button type="button" aria-label={`Skip ${e?.name}`} onClick={() => commit(skipExercise(a, it.id))}>Skip</button>
+            ) : n >= it.sets ? (
+              <span role="img" aria-label="done"><Icon name="check" size={16} /></span>
+            ) : null}
+          </div>
+        );
+      }}
+    />
+  );
 
   return (
     <section className="stack">
@@ -189,30 +225,33 @@ export function ActiveWorkoutPage() {
       <progress value={done} max={Math.max(1, total)} aria-label="Workout progress" />
       <p className="muted">{done} of {total} sets complete</p>
 
-      {rest && step ? (
-        <fieldset className="plain" disabled={paused}>
-        <div className="card">
-          <Timer key={rest.key} label="Rest" seconds={rest.seconds} autoStart paused={paused} onDone={() => setRest(null)} onSkip={() => setRest(null)} skipLabel="Skip rest" />
-          <p className="hint">{rest.kind === 'set' ? 'Rest between sets/rounds' : 'Rest before the next exercise'}</p>
-          {nextItem() && <p>Up next: <strong>{app.exerciseById.get(nextItem()!.exerciseId)?.name}</strong></p>}
-        </div>
-        </fieldset>
-      ) : step && item && ex ? (
-        <div className="card current" key={`${item.id}-${step.round}`}>
+      {step && item && ex ? (
+        <div className="card current active-summary">
           <div className="row-between">
             <h2><InfoLink ex={ex} itemId={item.id} onOpen={setInfo} /></h2>
             <span className={`badge ${item.setType}`}>{SET_TYPE_LABELS[item.setType]}</span>
           </div>
-          <p className="muted">{primaryMuscles(ex).map((m) => MUSCLE_LABELS[m]).join(', ')}</p>
           <p>
+            {rest && 'Up next: '}
             {item.setType === 'regular' ? 'Set' : 'Round'} {step.round + 1} of {item.sets} — target{' '}
             {ex.kind === 'timed' || ex.kind === 'cardio' || item.setType === 'hiit' ? `${item.durationSec}s` : `${item.reps} reps`}
             {ex.kind !== 'cardio' && (item.bodyweight ? (item.weightKg ? ` @ BW + ${formatWeight(item.weightKg, app.settings.units)}` : ' @ bodyweight') : ` @ ${formatWeight(item.weightKg, app.settings.units)}`)}
           </p>
-          <SetForm
-            item={item} lastLog={a.logs[item.id]?.slice(-1)[0]} paused={paused} onLog={onLog}
-            onSkip={() => { commit(skipExercise(a, item.id)); setRest(null); }}
-          />
+          {rest ? (
+            <div className="active-controls" key={`rest-${rest.key}`}>
+              <fieldset className="plain" disabled={paused}>
+                <Timer key={rest.key} label="Rest" seconds={rest.seconds} autoStart paused={paused} onDone={() => setRest(null)} onSkip={() => setRest(null)} skipLabel="Skip rest" />
+                <p className="hint">{rest.kind === 'set' ? 'Rest between sets/rounds' : 'Rest before the next exercise'}</p>
+              </fieldset>
+            </div>
+          ) : (
+            <div className="active-controls" key={`${item.id}-${step.round}`}>
+              <SetForm
+                item={item} lastLog={a.logs[item.id]?.slice(-1)[0]} paused={paused} onLog={onLog}
+                onSkip={() => { commit(skipExercise(a, item.id)); setRest(null); }}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="card">
@@ -221,43 +260,27 @@ export function ActiveWorkoutPage() {
         </div>
       )}
 
-      <fieldset className="plain" disabled={paused}>
       <div className="card">
-        <h3>Exercises</h3>
-        <WorkoutOverview
-          items={a.items} byId={app.exerciseById} onChangeItems={(items) => commit({ ...a, items })}
-          renderItem={(it, e) => {
-            const n = a.logs[it.id]?.length ?? 0;
-            const skipped = a.skipped.includes(it.id);
-            return (
-              <div className={`row-between active-item ${item?.id === it.id ? 'is-current' : ''}`}>
-                <span className={skipped ? 'struck' : ''}>
-                  {e ? <InfoLink ex={e} itemId={it.id} onOpen={setInfo} /> : it.exerciseId} <small>({n}/{it.sets})</small>
-                  {(a.logs[it.id] ?? []).map((l, i) => (
-                    <small key={i} className="set-line muted" style={{ display: 'block' }}>
-                      Set {i + 1}: {formatSetValues(l, e, app.settings.units)}
-                    </small>
-                  ))}
-                </span>
-                {skipped ? (
-                  <button type="button" onClick={() => commit(undoSkip(a, it.id))}>Undo skip</button>
-                ) : n < it.sets ? (
-                  <button type="button" aria-label={`Skip ${e?.name}`} onClick={() => commit(skipExercise(a, it.id))}>Skip</button>
-                ) : (
-                  <span role="img" aria-label="done"><Icon name="check" size={16} /></span>
-                )}
-              </div>
-            );
-          }}
-        />
+        <div className="row-between">
+          <h3>Remaining exercises</h3>
+          <button type="button" onClick={() => setShowExercises(true)}>View all exercises</button>
+        </div>
+        <fieldset className="plain active-exercise-list" disabled={paused}>
+          {overview(false)}
+        </fieldset>
       </div>
-
-      </fieldset>
 
       <div className="row wrap">
         <button type="button" className="primary" onClick={finish}>Finish workout</button>
         <button type="button" onClick={discard}>Discard</button>
       </div>
+      {showExercises && !info && (
+        <Modal title="All exercises" onClose={() => setShowExercises(false)}>
+          <fieldset className="plain active-exercise-list" disabled={paused}>
+            {overview(true)}
+          </fieldset>
+        </Modal>
+      )}
       {info && (
         <ExerciseInfoModal
           ex={info.ex} onClose={() => setInfo(null)}

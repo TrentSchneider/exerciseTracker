@@ -16,7 +16,7 @@ async function expectLayoutFits(page: Page) {
     if (root.scrollWidth > root.clientWidth + 1) {
       issues.push(`Page width ${root.scrollWidth} exceeds viewport ${root.clientWidth}`);
     }
-    for (const element of document.querySelectorAll<HTMLElement>('.content .card, .content fieldset, .content .row-between, .modal, .modal header, .list-btn')) {
+    for (const element of document.querySelectorAll<HTMLElement>('.content .card, .content fieldset, .content .row-between, .active-controls, .modal, .modal header, .list-btn')) {
       if (element.clientWidth && element.scrollWidth > element.clientWidth + 1) {
         issues.push(`${element.tagName}.${element.className}: ${element.scrollWidth} > ${element.clientWidth}`);
       }
